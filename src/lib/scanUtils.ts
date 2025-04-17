@@ -94,10 +94,10 @@ export async function fetchSubdomains(domain: string): Promise<string[]> {
       throw new Error(`Error fetching subdomains: ${response.statusText}`);
     }
     
-    const data = await response.json();
+    const data = await response.json() as Array<{ name_value: string }>;
     
     // Extract unique subdomains
-    const allNames = data.map((entry: any) => entry.name_value.split('\n')).flat();
+    const allNames = data.map((entry) => entry.name_value.split('\n')).flat();
     
     // Remove wildcard domains and duplicates
     const uniqueSubdomains = [...new Set(allNames.filter((name: string) => 
