@@ -1,0 +1,197 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Site Sleuth Recon</title>
+    <style>
+      body {
+        width: 400px;
+        max-height: 600px;
+        margin: 0;
+        padding: 16px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #f9fafb;
+      }
+      .card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        overflow: auto;
+      }
+      .card-header {
+        padding: 16px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+      .card-title {
+        margin: 0;
+        font-size: 18px;
+        color: #111827;
+      }
+      .card-description {
+        margin: 4px 0 0;
+        font-size: 12px;
+        color: #6b7280;
+      }
+      .card-content {
+        padding: 16px;
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        font-size: 12px;
+        font-weight: 500;
+        color: white;
+        background-color: #4f46e5;
+        border-radius: 9999px;
+      }
+      .tabs {
+        display: flex;
+        border-bottom: 1px solid #e5e7eb;
+      }
+      .tab {
+        flex: 1;
+        padding: 8px;
+        text-align: center;
+        cursor: pointer;
+        background: #f3f4f6;
+        border: none;
+        font-weight: 500;
+      }
+      .tab.active {
+        background: white;
+        border-bottom: 2px solid #4f46e5;
+      }
+      .tab-content {
+        display: none;
+        padding: 16px;
+      }
+      .tab-content.active {
+        display: block;
+      }
+      .button {
+        display: block;
+        width: 100%;
+        padding: 8px 16px;
+        background-color: #4f46e5;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      .button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .button-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      .spinner {
+        animation: spin 1s linear infinite;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      .result-list {
+        margin-top: 16px;
+      }
+      .result-list h3 {
+        font-size: 14px;
+        margin: 0 0 8px;
+      }
+      .result-item {
+        padding: 8px;
+        background-color: #f3f4f6;
+        border-radius: 4px;
+        margin-bottom: 4px;
+        font-size: 12px;
+        word-break: break-all;
+      }
+      .warning {
+        margin-bottom: 16px;
+        padding: 8px;
+        background-color: #fee2e2;
+        border-radius: 4px;
+        font-size: 12px;
+        color: #b91c1c;
+      }
+      .domain-display {
+        margin-bottom: 16px;
+        padding: 8px;
+        background-color: #f3f4f6;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .separator {
+        height: 1px;
+        background-color: #e5e7eb;
+        margin: 16px 0;
+      }
+      .footer {
+        font-size: 11px;
+        color: #6b7280;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="card-header">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h2 class="card-title">Site Sleuth Recon</h2>
+            <p class="card-description">Website reconnaissance tool</p>
+          </div>
+          <span class="badge">v1.0</span>
+        </div>
+      </div>
+      <div class="card-content">
+        <div class="warning">
+          This tool is for educational purposes only. Only use it on websites you own or have permission to test.
+        </div>
+        
+        <div class="domain-display" id="current-domain">
+          Loading domain...
+        </div>
+        
+        <div class="tabs">
+          <button class="tab active" data-tab="subdomains">Subdomains</button>
+          <button class="tab" data-tab="directories">Directories</button>
+        </div>
+        
+        <div class="tab-content active" id="subdomains-tab">
+          <button class="button" id="fetch-subdomains">Fetch Subdomains</button>
+          <div class="result-list">
+            <h3>Subdomains (<span id="subdomain-count">0</span>)</h3>
+            <div id="subdomain-results"></div>
+          </div>
+        </div>
+        
+        <div class="tab-content" id="directories-tab">
+          <button class="button" id="directory-scan">Start Directory Scan</button>
+          <div class="result-list">
+            <h3>Directories (<span id="directory-count">0</span>)</h3>
+            <div id="directory-results"></div>
+          </div>
+        </div>
+        
+        <div class="separator"></div>
+        
+        <div class="footer">
+          Use the extension on any website to scan for subdomains and common directories.
+        </div>
+      </div>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>
