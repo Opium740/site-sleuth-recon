@@ -91,14 +91,14 @@ export async function fetchSubdomains(domain: string): Promise<string[]> {
   try {
     // In Chrome extension, we'll communicate with the background script
     if (typeof chrome !== 'undefined' && chrome.runtime) {
-      return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage(
+      return new Promise<string[]>((resolve, reject) => {
+        chrome.runtime?.sendMessage(
           { action: 'fetchSubdomains', domain },
           (response) => {
             if (response.error) {
               reject(new Error(response.error));
             } else {
-              resolve(response.subdomains);
+              resolve(response.subdomains || []);
             }
           }
         );
@@ -138,8 +138,8 @@ export async function scanPath(baseUrl: string, path: string): Promise<string | 
     
     // In Chrome extension, we'll communicate with the background script
     if (typeof chrome !== 'undefined' && chrome.runtime) {
-      return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage(
+      return new Promise<string | null>((resolve, reject) => {
+        chrome.runtime?.sendMessage(
           { action: 'scanPath', url },
           (response) => {
             if (response.error) {

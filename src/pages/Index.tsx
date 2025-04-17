@@ -15,6 +15,7 @@ const Index = () => {
   const [subdomains, setSubdomains] = useState<string[]>([]);
   const [directories, setDirectories] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [activeOperation, setActiveOperation] = useState<string | null>(null);
   
   // Get the current tab's domain on component mount
   useEffect(() => {
@@ -22,7 +23,7 @@ const Index = () => {
       try {
         // Check if running in Chrome extension context
         if (typeof chrome !== 'undefined' && chrome.tabs) {
-          chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+          chrome.tabs?.query({active: true, currentWindow: true}, (tabs) => {
             if (tabs[0]?.url) {
               setCurrentDomain(extractDomain(tabs[0].url));
             }
@@ -44,12 +45,14 @@ const Index = () => {
     
     try {
       setIsLoading(true);
+      setActiveOperation('subdomains');
       const results = await fetchSubdomains(currentDomain);
       setSubdomains(results);
     } catch (error) {
       console.error("Error during subdomain scan:", error);
     } finally {
       setIsLoading(false);
+      setActiveOperation(null);
     }
   };
   
@@ -58,12 +61,14 @@ const Index = () => {
     
     try {
       setIsLoading(true);
+      setActiveOperation('directories');
       const results = await scanPaths(currentDomain);
       setDirectories(results);
     } catch (error) {
       console.error("Error during directory scan:", error);
     } finally {
       setIsLoading(false);
+      setActiveOperation(null);
     }
   };
   
@@ -97,7 +102,7 @@ const Index = () => {
                 label="Fetch Subdomains" 
                 onClick={handleSubdomainScan}
                 disabled={!currentDomain || isLoading}
-                loading={isLoading && subdomains.length === 0}
+                loading={isLoading && activeOperation === 'subdomains'}
               />
               
               <ResultList 
@@ -111,7 +116,7 @@ const Index = () => {
                 label="Start Directory Scan" 
                 onClick={handleDirectoryScan}
                 disabled={!currentDomain || isLoading}
-                loading={isLoading && directories.length === 0}
+                loading={isLoading && activeOperation === 'directories'}
               />
               
               <ResultList 

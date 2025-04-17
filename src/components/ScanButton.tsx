@@ -7,10 +7,14 @@ interface ScanButtonProps {
   label: string;
   onClick: () => Promise<void>;
   disabled?: boolean;
+  loading?: boolean; // Add loading prop
 }
 
-export function ScanButton({ label, onClick, disabled = false }: ScanButtonProps) {
+export function ScanButton({ label, onClick, disabled = false, loading: externalLoading }: ScanButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Use external loading state if provided, otherwise use internal state
+  const buttonLoading = externalLoading !== undefined ? externalLoading : isLoading;
 
   const handleClick = async () => {
     setIsLoading(true);
@@ -28,9 +32,9 @@ export function ScanButton({ label, onClick, disabled = false }: ScanButtonProps
       className="w-full flex items-center justify-center gap-2"
       variant="default" 
       onClick={handleClick}
-      disabled={isLoading || disabled}
+      disabled={buttonLoading || disabled}
     >
-      {isLoading ? (
+      {buttonLoading ? (
         <>
           <Loader2 className="h-4 w-4 animate-spin" />
           <span>Scanning...</span>
