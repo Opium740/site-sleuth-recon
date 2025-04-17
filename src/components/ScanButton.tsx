@@ -7,7 +7,7 @@ interface ScanButtonProps {
   label: string;
   onClick: () => Promise<void>;
   disabled?: boolean;
-  loading?: boolean; // Add loading prop
+  loading?: boolean;
 }
 
 export function ScanButton({ label, onClick, disabled = false, loading: externalLoading }: ScanButtonProps) {
