@@ -4,15 +4,31 @@ console.log("Site Sleuth Recon background service worker initialized");
 
 // Listen for messages from the popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log("Background received message:", message);
+  
   if (message.action === "scanPath") {
+    console.log("Scanning path:", message.url);
     fetchUrl(message.url)
-      .then(result => sendResponse(result))
-      .catch(error => sendResponse({ error: error.message }));
+      .then(result => {
+        console.log("Scan result:", result);
+        sendResponse(result);
+      })
+      .catch(error => {
+        console.error("Scan error:", error);
+        sendResponse({ error: error.message, success: false });
+      });
     return true; // Indicates we'll respond asynchronously
   } else if (message.action === "fetchSubdomains") {
+    console.log("Fetching subdomains for:", message.domain);
     fetchSubdomains(message.domain)
-      .then(subdomains => sendResponse({ subdomains }))
-      .catch(error => sendResponse({ error: error.message }));
+      .then(subdomains => {
+        console.log("Found subdomains:", subdomains.length);
+        sendResponse({ subdomains });
+      })
+      .catch(error => {
+        console.error("Subdomain fetch error:", error);
+        sendResponse({ error: error.message, subdomains: [] });
+      });
     return true; // Indicates we'll respond asynchronously
   }
 });
@@ -20,6 +36,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Function to fetch a URL and check its status
 async function fetchUrl(url) {
   try {
+    console.log("Fetching URL:", url);
     const response = await fetch(url, { method: 'HEAD' });
     return { 
       url, 
@@ -35,6 +52,7 @@ async function fetchUrl(url) {
 // Function to fetch subdomains from crt.sh
 async function fetchSubdomains(domain) {
   try {
+    console.log("Fetching from crt.sh for domain:", domain);
     const response = await fetch(`https://crt.sh/?q=%.${domain}&output=json`);
     if (!response.ok) {
       throw new Error(`Error fetching subdomains: ${response.statusText}`);

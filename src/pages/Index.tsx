@@ -9,6 +9,7 @@ import { Warning } from "@/components/Warning";
 import { DomainDisplay } from "@/components/DomainDisplay";
 import { extractDomain, fetchSubdomains, scanPaths } from "@/lib/scanUtils";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [currentDomain, setCurrentDomain] = useState<string | null>(null);
@@ -21,19 +22,36 @@ const Index = () => {
   useEffect(() => {
     const getCurrentDomain = async () => {
       try {
+        console.log("Getting current domain...");
         // Check if running in Chrome extension context
         if (typeof chrome !== 'undefined' && chrome.tabs) {
+          console.log("Using Chrome API to get current tab");
           chrome.tabs?.query({active: true, currentWindow: true}, (tabs) => {
             if (tabs[0]?.url) {
-              setCurrentDomain(extractDomain(tabs[0].url));
+              const domain = extractDomain(tabs[0].url);
+              console.log("Current domain:", domain);
+              setCurrentDomain(domain);
+            } else {
+              console.log("No URL found in current tab");
+              toast({
+                title: "Error",
+                description: "Could not detect the current website URL. Please try again.",
+                variant: "destructive"
+              });
             }
           });
         } else {
           // Fallback for web preview
-          setCurrentDomain(extractDomain(window.location.href));
+          console.log("Using window.location for domain (web preview)");
+          setCurrentDomain(extractDomain(window.location.href) || "example.com");
         }
       } catch (error) {
         console.error("Error getting current domain:", error);
+        toast({
+          title: "Error",
+          description: "Failed to detect domain: " + (error instanceof Error ? error.message : String(error)),
+          variant: "destructive"
+        });
       }
     };
     
@@ -41,15 +59,42 @@ const Index = () => {
   }, []);
   
   const handleSubdomainScan = async () => {
-    if (!currentDomain) return;
+    if (!currentDomain) {
+      toast({
+        title: "Error",
+        description: "No domain detected to scan",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
       setIsLoading(true);
       setActiveOperation('subdomains');
+      console.log(`Scanning subdomains for: ${currentDomain}`);
+      
       const results = await fetchSubdomains(currentDomain);
+      console.log(`Found ${results.length} subdomains`);
       setSubdomains(results);
+      
+      if (results.length > 0) {
+        toast({
+          title: "Scan Complete",
+          description: `Found ${results.length} subdomains`,
+        });
+      } else {
+        toast({
+          title: "No Results",
+          description: "No subdomains found",
+        });
+      }
     } catch (error) {
       console.error("Error during subdomain scan:", error);
+      toast({
+        title: "Scan Failed",
+        description: "Error scanning subdomains: " + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
       setActiveOperation(null);
@@ -57,15 +102,42 @@ const Index = () => {
   };
   
   const handleDirectoryScan = async () => {
-    if (!currentDomain) return;
+    if (!currentDomain) {
+      toast({
+        title: "Error",
+        description: "No domain detected to scan",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
       setIsLoading(true);
       setActiveOperation('directories');
+      console.log(`Scanning directories for: ${currentDomain}`);
+      
       const results = await scanPaths(currentDomain);
+      console.log(`Found ${results.length} accessible directories`);
       setDirectories(results);
+      
+      if (results.length > 0) {
+        toast({
+          title: "Scan Complete",
+          description: `Found ${results.length} accessible directories`,
+        });
+      } else {
+        toast({
+          title: "No Results",
+          description: "No accessible directories found",
+        });
+      }
     } catch (error) {
       console.error("Error during directory scan:", error);
+      toast({
+        title: "Scan Failed",
+        description: "Error scanning directories: " + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
       setActiveOperation(null);

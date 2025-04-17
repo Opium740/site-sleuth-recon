@@ -95,16 +95,25 @@ export async function fetchSubdomains(domain: string): Promise<string[]> {
         chrome.runtime?.sendMessage(
           { action: 'fetchSubdomains', domain },
           (response) => {
-            if (response.error) {
+            if (chrome.runtime?.lastError) {
+              console.error('Chrome runtime error:', chrome.runtime.lastError);
+              reject(new Error(chrome.runtime.lastError.message));
+              return;
+            }
+            
+            if (response && response.error) {
               reject(new Error(response.error));
-            } else {
+            } else if (response) {
               resolve(response.subdomains || []);
+            } else {
+              resolve([]);
             }
           }
         );
       });
     } else {
       // Fallback to direct fetch for web preview
+      console.log('Using fallback fetch for subdomains');
       const response = await fetch(`https://crt.sh/?q=%.${domain}&output=json`);
       if (!response.ok) {
         throw new Error(`Error fetching subdomains: ${response.statusText}`);
@@ -135,6 +144,7 @@ export async function fetchSubdomains(domain: string): Promise<string[]> {
 export async function scanPath(baseUrl: string, path: string): Promise<string | null> {
   try {
     const url = new URL(path, baseUrl).toString();
+    console.log('Scanning path:', url);
     
     // In Chrome extension, we'll communicate with the background script
     if (typeof chrome !== 'undefined' && chrome.runtime) {
@@ -142,10 +152,13 @@ export async function scanPath(baseUrl: string, path: string): Promise<string | 
         chrome.runtime?.sendMessage(
           { action: 'scanPath', url },
           (response) => {
-            if (response.error) {
-              console.error(`Error scanning ${path}:`, response.error);
+            if (chrome.runtime?.lastError) {
+              console.error('Chrome runtime error:', chrome.runtime.lastError);
               resolve(null);
-            } else if (response.success) {
+              return;
+            }
+            
+            if (response && response.success) {
               resolve(url);
             } else {
               resolve(null);
@@ -155,6 +168,7 @@ export async function scanPath(baseUrl: string, path: string): Promise<string | 
       });
     } else {
       // Fallback to direct fetch for web preview (with CORS limitations)
+      console.log('Using fallback fetch for scanning path');
       const response = await fetch(url, {
         method: 'HEAD',
         mode: 'no-cors',
