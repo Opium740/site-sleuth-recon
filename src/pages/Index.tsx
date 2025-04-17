@@ -14,20 +14,23 @@ const Index = () => {
   const [currentDomain, setCurrentDomain] = useState<string | null>(null);
   const [subdomains, setSubdomains] = useState<string[]>([]);
   const [directories, setDirectories] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   
   // Get the current tab's domain on component mount
   useEffect(() => {
     const getCurrentDomain = async () => {
       try {
-        // In a real Chrome extension, we would use the chrome.tabs API:
-        // chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-        //   if (tabs[0]?.url) {
-        //     setCurrentDomain(extractDomain(tabs[0].url));
-        //   }
-        // });
-        
-        // For the web preview, we'll just use the current window location
-        setCurrentDomain(extractDomain(window.location.href));
+        // Check if running in Chrome extension context
+        if (typeof chrome !== 'undefined' && chrome.tabs) {
+          chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+            if (tabs[0]?.url) {
+              setCurrentDomain(extractDomain(tabs[0].url));
+            }
+          });
+        } else {
+          // Fallback for web preview
+          setCurrentDomain(extractDomain(window.location.href));
+        }
       } catch (error) {
         console.error("Error getting current domain:", error);
       }
@@ -40,10 +43,13 @@ const Index = () => {
     if (!currentDomain) return;
     
     try {
+      setIsLoading(true);
       const results = await fetchSubdomains(currentDomain);
       setSubdomains(results);
     } catch (error) {
       console.error("Error during subdomain scan:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
   
@@ -51,16 +57,19 @@ const Index = () => {
     if (!currentDomain) return;
     
     try {
+      setIsLoading(true);
       const results = await scanPaths(currentDomain);
       setDirectories(results);
     } catch (error) {
       console.error("Error during directory scan:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
   
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="extension-container mx-auto">
+      <Card className="extension-container mx-auto" style={{ width: '400px', maxHeight: '600px', overflow: 'auto' }}>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <div>
@@ -87,7 +96,8 @@ const Index = () => {
               <ScanButton 
                 label="Fetch Subdomains" 
                 onClick={handleSubdomainScan}
-                disabled={!currentDomain}
+                disabled={!currentDomain || isLoading}
+                loading={isLoading && subdomains.length === 0}
               />
               
               <ResultList 
@@ -100,7 +110,8 @@ const Index = () => {
               <ScanButton 
                 label="Start Directory Scan" 
                 onClick={handleDirectoryScan}
-                disabled={!currentDomain}
+                disabled={!currentDomain || isLoading}
+                loading={isLoading && directories.length === 0}
               />
               
               <ResultList 
@@ -114,8 +125,7 @@ const Index = () => {
           <Separator className="my-4" />
           
           <div className="text-xs text-muted-foreground">
-            For demonstration purposes only. In a real Chrome extension, scans would be performed 
-            using background scripts to avoid CORS issues.
+            Use the extension on any website to scan for subdomains and common directories.
           </div>
         </CardContent>
       </Card>

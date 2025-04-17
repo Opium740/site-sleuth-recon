@@ -89,22 +89,39 @@ export function delay(ms: number): Promise<void> {
  */
 export async function fetchSubdomains(domain: string): Promise<string[]> {
   try {
-    const response = await fetch(`https://crt.sh/?q=%.${domain}&output=json`);
-    if (!response.ok) {
-      throw new Error(`Error fetching subdomains: ${response.statusText}`);
+    // In Chrome extension, we'll communicate with the background script
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+      return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage(
+          { action: 'fetchSubdomains', domain },
+          (response) => {
+            if (response.error) {
+              reject(new Error(response.error));
+            } else {
+              resolve(response.subdomains);
+            }
+          }
+        );
+      });
+    } else {
+      // Fallback to direct fetch for web preview
+      const response = await fetch(`https://crt.sh/?q=%.${domain}&output=json`);
+      if (!response.ok) {
+        throw new Error(`Error fetching subdomains: ${response.statusText}`);
+      }
+      
+      const data = await response.json() as Array<{ name_value: string }>;
+      
+      // Extract unique subdomains
+      const allNames = data.map((entry) => entry.name_value.split('\n')).flat();
+      
+      // Remove wildcard domains and duplicates
+      const uniqueSubdomains = [...new Set(allNames.filter((name: string) => 
+        !name.includes('*') && name.includes(domain)
+      ))];
+      
+      return uniqueSubdomains;
     }
-    
-    const data = await response.json() as Array<{ name_value: string }>;
-    
-    // Extract unique subdomains
-    const allNames = data.map((entry) => entry.name_value.split('\n')).flat();
-    
-    // Remove wildcard domains and duplicates
-    const uniqueSubdomains = [...new Set(allNames.filter((name: string) => 
-      !name.includes('*') && name.includes(domain)
-    ))];
-    
-    return uniqueSubdomains;
   } catch (error) {
     console.error('Error fetching subdomains:', error);
     return [];
@@ -119,17 +136,33 @@ export async function scanPath(baseUrl: string, path: string): Promise<string | 
   try {
     const url = new URL(path, baseUrl).toString();
     
-    const response = await fetch(url, {
-      method: 'HEAD',
-      mode: 'no-cors',
-      // We can't actually check the status directly due to CORS
-      // In a real extension, this would use chrome.runtime.sendMessage to have
-      // the background script perform the fetch
-    });
-    
-    // Since we're using no-cors mode, we assume success
-    // In a real extension with background script, we'd check response.status === 200
-    return url;
+    // In Chrome extension, we'll communicate with the background script
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+      return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage(
+          { action: 'scanPath', url },
+          (response) => {
+            if (response.error) {
+              console.error(`Error scanning ${path}:`, response.error);
+              resolve(null);
+            } else if (response.success) {
+              resolve(url);
+            } else {
+              resolve(null);
+            }
+          }
+        );
+      });
+    } else {
+      // Fallback to direct fetch for web preview (with CORS limitations)
+      const response = await fetch(url, {
+        method: 'HEAD',
+        mode: 'no-cors',
+      });
+      
+      // Since we're using no-cors mode, we assume success
+      return url;
+    }
   } catch (error) {
     console.error(`Error scanning ${path}:`, error);
     return null;
