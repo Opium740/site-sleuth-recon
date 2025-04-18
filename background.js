@@ -1,35 +1,41 @@
+
 // Background service worker for Site Sleuth Recon
 console.log("Site Sleuth Recon background service worker initialized");
 
-// List of common and known service subdomains for major websites
-const COMMON_SUBDOMAIN_PREFIXES = [
-  'www', 'mail', 'remote', 'blog', 'webmail', 'server', 'ns1', 'ns2', 
-  'smtp', 'secure', 'vpn', 'm', 'shop', 'ftp', 'mail2', 'test', 'portal', 
-  'dns', 'host', 'mail1', 'mx', 'email', 'cloud', 'api', 'exchange', 
-  'app', 'staging', 'proxy', 'backup', 'dev', 'web', 'admin', 'cdn', 
-  'login', 'store', 'beta', 'support', 'search', 'mobile', 'forum', 'images', 
-  'news', 'docs', 'status', 'help', 'intranet', 'media', 'static', 'db',
-  'demo', 'dashboard', 'go', 'wiki', 'internal', 'design', 'training', 'svn',
-  'git', 'jenkins', 'team', 'chat', 'labs', 'hr', 'crm', 'sonarqube',
-  'confluence', 'analytics', 'jira', 'graphql', 'monitoring', 'docker', 'billing',
+// Enhanced wordlist with Google-specific services - similar to FFuF wordlists
+const COMPREHENSIVE_WORDLIST = [
   // Google-specific services
-  'drive', 'maps', 'photos', 'calendar', 'accounts', 'play', 'meet', 'chat',
+  'drive', 'mail', 'maps', 'photos', 'calendar', 'accounts', 'play', 'meet', 'chat',
   'classroom', 'cloud', 'translate', 'myaccount', 'domains', 'sites', 'groups',
-  'hangouts', 'photos', 'pay', 'scholar', 'books', 'earth', 'analytics',
+  'hangouts', 'pay', 'scholar', 'books', 'earth', 'analytics',
+  
   // Microsoft-specific services
   'onedrive', 'office', 'teams', 'outlook', 'azure', 'bing', 'live', 'account',
-  // Amazon-specific services
-  'aws', 'console', 's3', 'ec2', 'signin', 'login', 'seller', 'smile',
-  // Facebook-specific services
-  'developers', 'business', 'connect', 'messenger', 'workplace', 'gaming',
-  // Other common services
+  
+  // Common infrastructure
+  'www', 'admin', 'dev', 'test', 'staging', 'beta', 'internal', 'vpn', 'remote', 
+  'support', 'help', 'blog', 'cdn', 'static', 'api', 'service', 'gateway',
+  
+  // Security and monitoring
+  'security', 'monitoring', 'logs', 'metrics', 'status', 'healthcheck',
+  
+  // Development and CI/CD
+  'git', 'svn', 'jenkins', 'gitlab', 'bitbucket', 'ci', 'cd', 'build',
+  
+  // Database and backend
+  'db', 'database', 'sql', 'mysql', 'postgres', 'mongodb', 'redis', 
+  'backend', 'server', 'proxy', 'cache',
+  
+  // Common subdomains
+  'intranet', 'extranet', 'portal', 'dashboard', 'panel', 'login', 
+  'auth', 'sso', 'marketplace', 'store', 'billing', 'crm', 'erp',
   'help', 'support', 'kb', 'faq', 'feedback', 'community', 'developer',
   'affiliate', 'partners', 'careers', 'jobs', 'about', 'contact', 'learn',
   'training', 'video', 'audio', 'music', 'tv', 'streaming', 'press', 'investor',
   'security', 'privacy', 'legal', 'terms', 'careers', 'blog', 'status'
 ];
 
-// Additional subdomain prefixes for service-specific sites
+// Service-specific subdomain prefixes (like Amass configuration)
 const SERVICE_SPECIFIC_PREFIXES = {
   'google.com': [
     'mail', 'drive', 'docs', 'photos', 'calendar', 'meet', 'chat', 'maps',
@@ -42,18 +48,39 @@ const SERVICE_SPECIFIC_PREFIXES = {
     'outlook', 'office', 'teams', 'onedrive', 'azure', 'windows', 'account',
     'docs', 'support', 'learn', 'developer', 'techcommunity', 'partner', 'msdn'
   ],
-  'amazon.com': [
-    'aws', 'seller', 'affiliate', 'developer', 'console', 'services', 'smile',
-    'pay', 'music', 'prime', 'kindle', 'photos', 'drive'
-  ],
-  'facebook.com': [
-    'developers', 'business', 'm', 'workplace', 'gaming', 'messenger'
-  ],
   'github.com': [
     'gist', 'api', 'education', 'pages', 'status', 'support', 'enterprise',
     'training', 'classroom', 'docs'
   ]
 };
+
+// Path wordlist for directory fuzzing (like FFuF paths.txt)
+const COMMON_PATHS = [
+  'admin', 'login', 'wp-admin', 'administrator', 'dashboard', 'wp-login.php',
+  'admin.php', 'api', 'v1', 'v2', 'api/v1', 'console', 'panel', 'control',
+  'webmail', 'mail', 'cpanel', 'phpmyadmin', 'db', 'database', 'backups',
+  'backup', 'dev', 'development', 'staging', 'test', 'beta', 'old', '.git',
+  '.env', 'config', 'settings', 'setup', 'install', 'wp-config.php', 'config.php',
+  'server-status', 'logs', 'log', 'tmp', 'temp', 'uploads', 'download', 'public',
+  'private', 'wp-content', 'wp-includes', 'images', 'img', 'js', 'css', 'assets',
+  'plugins', 'themes', 'files', 'docs', 'documentation', 'forum', 'forums',
+  'blog', 'blogs', 'shop', 'store', 'cart', 'checkout', 'account', 'members',
+  'member', 'user', 'users', 'profile', 'billing', 'payment', 'payments',
+  'order', 'orders', 'product', 'products', 'category', 'categories', 'tag',
+  'tags', 'comment', 'comments', 'search', 'wp-json', 'api/graphql', 'graphql',
+  'wp', 'wordpress', 'joomla', 'drupal', 'magento', 'index.php', 'home', 'site',
+  'local', 'media', 'news', 'archive', 'old-site', 'new-site', 'test-site',
+  'demo', 'rss', 'xml', 'sitemap', 'sitemap.xml', 'robots.txt', 'license',
+  'CHANGELOG', 'README', '.htaccess', '.svn', 'vendor', 'node_modules',
+  'composer.json', 'package.json', '.DS_Store', 'cgi-bin', 'services', 'editor',
+  'auth', 'sign-in', 'login.php', 'signin', 'signup', 'register', 'forgotten-password',
+  'reset-password', 'password-reset', 'recover', 'recovery'
+];
+
+// Utility function for rate-limited fetching
+async function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // Listen for messages from the popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -120,19 +147,15 @@ async function fetchUrl(url) {
   }
 }
 
-// Function to fetch subdomains from multiple sources
+// Function to fetch subdomains from multiple sources - inspired by Amass approach
 async function fetchSubdomains(domain) {
   try {
     console.log("Fetching from multiple sources for domain:", domain);
     const subdomains = new Set();
     
-    // Track our fetching progress
-    let completedSources = 0;
-    const totalSources = 5; // Currently using 5 sources
-    
-    // 1. Try crt.sh (SSL certificates)
+    // 1. Try certificate transparency logs (passive, similar to Amass passive collection)
     try {
-      console.log("Fetching from crt.sh for domain:", domain);
+      console.log("Fetching from certificate transparency logs (crt.sh)");
       const response = await fetch(`https://crt.sh/?q=%.${domain}&output=json`, {
         mode: 'cors',
         cache: 'no-cache'
@@ -154,42 +177,20 @@ async function fetchSubdomains(domain) {
           name.match(/^[a-zA-Z0-9.-]+$/) // Only allow alphanumeric, dots and hyphens
         ).forEach(name => subdomains.add(name));
         
-        console.log(`Found ${subdomains.size} subdomains from crt.sh`);
+        console.log(`Found ${subdomains.size} subdomains from certificate transparency`);
       } else {
-        console.warn("crt.sh response not OK:", response.status);
+        console.warn("Certificate transparency response not OK:", response.status);
       }
     } catch (error) {
-      console.error("Error with crt.sh:", error);
+      console.error("Error with certificate transparency:", error);
     }
     
-    completedSources++;
-    
-    // 2. Try VirusTotal API (if available - passive for now)
+    // 2. FFuF-style subdomain enumeration with adaptive wordlists
     try {
-      // This is just a placeholder - actual VirusTotal API requires an API key
-      console.log("VirusTotal API would be queried here in a production version");
-    } catch (error) {
-      console.error("Error with VirusTotal:", error);
-    }
-    
-    completedSources++;
-    
-    // 3. Try SecurityTrails API (if available - passive for now)
-    try {
-      // This is just a placeholder - actual SecurityTrails API requires an API key
-      console.log("SecurityTrails API would be queried here in a production version");
-    } catch (error) {
-      console.error("Error with SecurityTrails:", error);
-    }
-    
-    completedSources++;
-
-    // 4. Try common subdomain enumeration
-    try {
-      console.log("Using common subdomain wordlist");
-      let subdomainPrefixes = [...COMMON_SUBDOMAIN_PREFIXES];
+      console.log("Using adaptive wordlist for subdomain fuzzing");
+      let subdomainPrefixes = [...COMPREHENSIVE_WORDLIST];
       
-      // Add service-specific prefixes if we know the domain
+      // Add service-specific prefixes if we know the domain (similar to FFuF custom wordlists)
       for (const [serviceDomain, prefixes] of Object.entries(SERVICE_SPECIFIC_PREFIXES)) {
         if (domain.includes(serviceDomain)) {
           console.log(`Adding ${prefixes.length} service-specific prefixes for ${serviceDomain}`);
@@ -200,41 +201,39 @@ async function fetchSubdomains(domain) {
       // Remove duplicates from the prefixes
       subdomainPrefixes = [...new Set(subdomainPrefixes)];
       
-      for (const prefix of subdomainPrefixes) {
-        const subdomain = `${prefix}.${domain}`;
-        try {
-          await fetch(`https://${subdomain}`, { mode: 'no-cors', method: 'HEAD' });
-          // If no error thrown, add it to our results
-          subdomains.add(subdomain);
-        } catch (e) {
-          // Ignore errors - just means this subdomain doesn't exist or can't be accessed
-        }
+      // Process in batches with rate limiting (like FFuF's rate limiting)
+      const batchSize = 5;
+      for (let i = 0; i < subdomainPrefixes.length; i += batchSize) {
+        const batch = subdomainPrefixes.slice(i, i + batchSize);
+        
+        // Process batch in parallel
+        const batchPromises = batch.map(async (prefix) => {
+          const subdomain = `${prefix}.${domain}`;
+          try {
+            await fetch(`https://${subdomain}`, { mode: 'no-cors', method: 'HEAD' });
+            // If no error thrown, add it to our results
+            subdomains.add(subdomain);
+          } catch (e) {
+            // Ignore errors - just means this subdomain doesn't exist or can't be accessed
+          }
+        });
+        
+        await Promise.all(batchPromises);
+        await delay(300); // Rate limiting between batches
       }
       
-      console.log(`Found ${subdomains.size} subdomains total after wordlist check`);
+      console.log(`Found ${subdomains.size} subdomains total after wordlist fuzzing`);
     } catch (error) {
-      console.error("Error with subdomain wordlist check:", error);
+      console.error("Error with subdomain wordlist fuzzing:", error);
     }
     
-    completedSources++;
+    // 3. Add base domain itself
+    subdomains.add(domain);
     
-    // 5. Try DNS resolution with common patterns
-    try {
-      console.log("Checking DNS resolution for common patterns");
-      // Add base domain itself
-      subdomains.add(domain);
-      
-      // Add www if it's not already the base domain
-      if (!domain.startsWith('www.')) {
-        subdomains.add(`www.${domain}`);
-      }
-      
-      console.log(`Found ${subdomains.size} subdomains total after DNS checks`);
-    } catch (error) {
-      console.error("Error with DNS checks:", error);
+    // 4. Add www if it's not already the base domain
+    if (!domain.startsWith('www.')) {
+      subdomains.add(`www.${domain}`);
     }
-    
-    completedSources++;
     
     // Clean any potentially invalid subdomains before returning
     const cleanedSubdomains = [...subdomains].filter(subdomain => {
@@ -245,7 +244,7 @@ async function fetchSubdomains(domain) {
         !subdomain.includes('..') &&
         !subdomain.includes('\\') &&
         !subdomain.includes('---') &&
-        subdomain.match(/^[a-zA-Z0-9.-]+$/); // Only allow alphanumeric, dots and hyphens
+        !subdomain.match(/[^a-zA-Z0-9.-]/); // Only allow alphanumeric, dots and hyphens
     });
     
     return cleanedSubdomains;
@@ -253,45 +252,4 @@ async function fetchSubdomains(domain) {
     console.error('Error in subdomain fetching:', error);
     throw error;
   }
-}
-
-// Advanced subdomain enumeration function
-async function advancedSubdomainEnumeration(domain) {
-  const subdomains = new Set();
-  
-  // Multiple techniques
-  const techniques = [
-    traditionalSubdomainBruteforce,
-    // Add more techniques like DNS zone transfer, SRV record scanning
-  ];
-  
-  for (const technique of techniques) {
-    const results = await technique(domain);
-    results.forEach(subdomain => subdomains.add(subdomain));
-  }
-  
-  return Array.from(subdomains);
-}
-
-// Traditional subdomain bruteforce
-async function traditionalSubdomainBruteforce(domain) {
-  const results = [];
-  
-  for (const prefix of COMMON_SUBDOMAIN_PREFIXES) {
-    const subdomain = `${prefix}.${domain}`;
-    try {
-      const response = await fetch(`https://${subdomain}`, { 
-        method: 'HEAD', 
-        mode: 'no-cors' 
-      });
-      results.push(subdomain);
-    } catch {
-      // Silently handle non-existent subdomains
-    }
-    
-    // Rate limiting
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  
-  return results;
 }
