@@ -19,7 +19,17 @@ const COMMON_PATHS = [
   'CHANGELOG', 'README', '.htaccess', '.svn', 'vendor', 'node_modules',
   'composer.json', 'package.json', '.DS_Store', 'cgi-bin', 'services', 'editor',
   'auth', 'sign-in', 'login.php', 'signin', 'signup', 'register', 'forgotten-password',
-  'reset-password', 'password-reset', 'recover', 'recovery'
+  'reset-password', 'password-reset', 'recover', 'recovery',
+  // Additional paths
+  'api/v3', 'auth/login', 'portal/login', 'dashboard/admin', 'wp-json/wp/v2',
+  'admin/login', 'administrator/index.php', 'wp/wp-admin', 'cms', 'cms/admin',
+  'static', 'static/js', 'static/css', 'static/images', 'static/fonts',
+  'assets/js', 'assets/css', 'assets/images', 'assets/fonts',
+  'login/oauth', 'system', 'app/config', 'app/settings', 'api/token',
+  'api/auth', 'health', 'status/health', 'metrics', 'prometheus',
+  'help/support', 'support/contact', 'contact', 'about', 'about-us',
+  'terms', 'privacy', 'jobs', 'career', 'press', 'news/press',
+  'investors', 'partners', 'affiliate', 'legal', 'tos'
 ];
 
 // DOM elements
@@ -97,8 +107,33 @@ function saveToFile(data, filename) {
 // Function to show a toast notification
 function showToast(title, message, type = 'info') {
   console.log(`${title}: ${message}`);
-  // Since we're in a simple extension, we'll just use console.log for now
-  // In a more complex extension, we'd implement a visual toast notification
+  
+  // Create toast element
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.style.position = 'fixed';
+  toast.style.bottom = '20px';
+  toast.style.left = '50%';
+  toast.style.transform = 'translateX(-50%)';
+  toast.style.backgroundColor = type === 'error' ? '#ef4444' : '#10b981';
+  toast.style.color = 'white';
+  toast.style.padding = '10px 20px';
+  toast.style.borderRadius = '5px';
+  toast.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.25)';
+  toast.style.zIndex = '1000';
+  toast.style.transition = 'opacity 0.3s ease-in-out';
+  toast.textContent = `${title}: ${message}`;
+  
+  // Add to DOM
+  document.body.appendChild(toast);
+  
+  // Remove after 3 seconds
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => {
+      document.body.removeChild(toast);
+    }, 300);
+  }, 3000);
 }
 
 // Function to extract domain from a URL
@@ -190,6 +225,20 @@ function setupTabs() {
   });
 }
 
+// Function to clean and validate subdomain results
+function cleanSubdomainResults(subdomains) {
+  return subdomains.filter(subdomain => {
+    // Basic validation to avoid obviously incorrect subdomains
+    return subdomain && 
+      subdomain.includes('.') && 
+      !subdomain.includes('--') &&
+      !subdomain.includes('..') &&
+      !subdomain.includes('\\') &&
+      !subdomain.includes('---') &&
+      subdomain.match(/^[a-zA-Z0-9.-]+$/); // Only allow alphanumeric, dots and hyphens
+  });
+}
+
 // Function to get the current tab's domain
 function getCurrentDomain() {
   try {
@@ -204,6 +253,9 @@ function getCurrentDomain() {
         if (domain) {
           fetchSubdomainsButton.disabled = false;
           directoryScanButton.disabled = false;
+          
+          // Load any saved results for this domain
+          loadStateFromChromeStorage(domain);
         }
       } else {
         console.log("No URL found in current tab");
@@ -242,12 +294,15 @@ function handleSubdomainScan() {
         console.error("Error during subdomain scan:", response.error);
         showToast("Scan Failed", "Error scanning subdomains: " + response.error, "error");
       } else if (response && response.subdomains) {
-        scannedSubdomains = response.subdomains;
-        console.log(`Found ${scannedSubdomains.length} subdomains`);
+        scannedSubdomains = cleanSubdomainResults(response.subdomains);
+        console.log(`Found ${scannedSubdomains.length} subdomains after cleaning`);
         updateResults('subdomain-results', 'subdomain-count', scannedSubdomains);
         
         // Enable save button if results found
         saveSubdomainsButton.disabled = scannedSubdomains.length === 0;
+        
+        // Save the results to Chrome storage
+        saveStateToChromeStorage();
         
         if (scannedSubdomains.length > 0) {
           showToast("Scan Complete", `Found ${scannedSubdomains.length} subdomains`);
@@ -275,6 +330,9 @@ function handleDirectoryScan() {
   scannedDirectories = [];
   let completedScans = 0;
   
+  // Show progress toast
+  showToast("Scan Started", `Scanning ${COMMON_PATHS.length} directories...`);
+  
   // Scan each path
   COMMON_PATHS.forEach(path => {
     const url = `https://${currentDomain}/${path}`;
@@ -289,15 +347,19 @@ function handleDirectoryScan() {
           // Continue with other scans
         } else if (response && response.success) {
           scannedDirectories.push(url);
+          // Update results in real-time
+          updateResults('directory-results', 'directory-count', scannedDirectories);
         }
         
         // Check if all scans are complete
         if (completedScans === COMMON_PATHS.length) {
           console.log(`Found ${scannedDirectories.length} accessible directories`);
-          updateResults('directory-results', 'directory-count', scannedDirectories);
           
           // Enable save button if results found
           saveDirectoriesButton.disabled = scannedDirectories.length === 0;
+          
+          // Save the results to Chrome storage
+          saveStateToChromeStorage();
           
           if (scannedDirectories.length > 0) {
             showToast("Scan Complete", `Found ${scannedDirectories.length} accessible directories`);
@@ -306,6 +368,9 @@ function handleDirectoryScan() {
           }
           
           setLoading('directories', false);
+        } else if (completedScans % 10 === 0) {
+          // Update progress periodically
+          console.log(`Completed ${completedScans}/${COMMON_PATHS.length} directory scans`);
         }
       }
     );
@@ -368,25 +433,3 @@ document.addEventListener('DOMContentLoaded', () => {
   // Save state when popup is closed
   window.addEventListener('beforeunload', saveStateToChromeStorage);
 });
-
-// When the domain is set, try to load previous results
-function watchForDomainChanges() {
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      if (mutation.type === 'characterData' || mutation.type === 'childList') {
-        if (currentDomain) {
-          loadStateFromChromeStorage(currentDomain);
-        }
-      }
-    });
-  });
-  
-  observer.observe(currentDomainElement, { 
-    characterData: true,
-    childList: true,
-    subtree: true
-  });
-}
-
-// Start observing for domain changes
-watchForDomainChanges();

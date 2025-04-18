@@ -14,7 +14,9 @@
   },
   "permissions": [
     "activeTab",
-    "downloads"
+    "storage",
+    "downloads",
+    "dns"
   ],
   "host_permissions": [
     "https://*/*"
