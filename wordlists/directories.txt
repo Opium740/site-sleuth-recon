@@ -1,0 +1,8 @@
+
+admin
+wp-admin
+login
+api
+backup
+config
+# Add your own directory paths here

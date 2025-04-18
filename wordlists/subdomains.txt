@@ -1,0 +1,10 @@
+
+www
+mail
+admin
+dev
+test
+staging
+api
+cdn
+# Add your own subdomain entries here

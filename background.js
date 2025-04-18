@@ -1,4 +1,3 @@
-
 // Background service worker for Site Sleuth Recon
 console.log("Site Sleuth Recon background service worker initialized");
 
@@ -82,6 +81,120 @@ async function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Function to load wordlists from files
+async function loadWordlist(filename) {
+  try {
+    const response = await fetch(chrome.runtime.getURL(`wordlists/${filename}`));
+    if (!response.ok) throw new Error('Failed to load wordlist');
+    const text = await response.text();
+    return text.split('\n').filter(line => 
+      line && !line.startsWith('#') && line.trim()
+    );
+  } catch (error) {
+    console.error(`Error loading wordlist ${filename}:`, error);
+    return [];
+  }
+}
+
+// Modified fetchSubdomains function to use external wordlists
+async function fetchSubdomains(domain) {
+  try {
+    console.log("Fetching from multiple sources for domain:", domain);
+    const subdomains = new Set();
+    
+    // 1. Load and use custom wordlists
+    const customWordlist = await loadWordlist('subdomains.txt');
+    console.log(`Loaded ${customWordlist.length} entries from custom wordlist`);
+    
+    if (customWordlist.length > 0) {
+      // Process custom wordlist entries
+      const batchSize = 5;
+      for (let i = 0; i < customWordlist.length; i += batchSize) {
+        const batch = customWordlist.slice(i, i + batchSize);
+        const batchPromises = batch.map(async (prefix) => {
+          const subdomain = `${prefix}.${domain}`;
+          try {
+            await fetch(`https://${subdomain}`, { mode: 'no-cors', method: 'HEAD' });
+            subdomains.add(subdomain);
+          } catch (e) {
+            // Subdomain not accessible
+          }
+        });
+        
+        await Promise.all(batchPromises);
+        await delay(300); // Rate limiting
+      }
+    }
+    
+    // 2. Certificate transparency logs (keep this as backup)
+    try {
+      console.log("Fetching from certificate transparency logs");
+      const response = await fetch(`https://crt.sh/?q=%.${domain}&output=json`, {
+        mode: 'cors',
+        cache: 'no-cache'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const allNames = data.map(entry => entry.name_value.split('\n')).flat();
+        
+        allNames.filter(name => 
+          !name.includes('*') && 
+          name.includes(domain) &&
+          !name.includes('--') &&
+          !name.includes('..') &&
+          !name.includes('\\') &&
+          name.match(/^[a-zA-Z0-9.-]+$/)
+        ).forEach(name => subdomains.add(name));
+      }
+    } catch (error) {
+      console.error("Error with certificate transparency:", error);
+    }
+    
+    // Clean and return results
+    return Array.from(subdomains).filter(subdomain => 
+      subdomain && 
+      subdomain.includes('.') && 
+      !subdomain.includes('--') &&
+      !subdomain.match(/[^a-zA-Z0-9.-]/)
+    );
+  } catch (error) {
+    console.error('Error in subdomain fetching:', error);
+    throw error;
+  }
+}
+
+// Modified directory scanning to use custom wordlist
+async function scanDirectories(domain) {
+  try {
+    const customPaths = await loadWordlist('directories.txt');
+    const paths = customPaths.length > 0 ? customPaths : COMMON_PATHS;
+    
+    const results = [];
+  
+    // Use advanced path wordlist for directory fuzzing (like FFuF)
+    for (const path of paths) {
+      const url = `https://${domain}/${path}`;
+      
+      try {
+        // Check if path exists using HEAD request with no-cors mode
+        const response = await fetch(url, { method: 'HEAD', mode: 'no-cors' });
+        results.push(url);
+      } catch {
+        // Silently handle inaccessible paths
+      }
+      
+      // Rate limiting
+      await delay(100);
+    }
+    
+    return results;
+  } catch (error) {
+    console.error('Error loading directory wordlist:', error);
+    return COMMON_PATHS; // Fallback to built-in paths
+  }
+}
+
 // Listen for messages from the popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("Background received message:", message);
@@ -144,112 +257,5 @@ async function fetchUrl(url) {
   } catch (error) {
     console.error(`Error fetching ${url}:`, error);
     return { url, error: error.message, success: false };
-  }
-}
-
-// Function to fetch subdomains from multiple sources - inspired by Amass approach
-async function fetchSubdomains(domain) {
-  try {
-    console.log("Fetching from multiple sources for domain:", domain);
-    const subdomains = new Set();
-    
-    // 1. Try certificate transparency logs (passive, similar to Amass passive collection)
-    try {
-      console.log("Fetching from certificate transparency logs (crt.sh)");
-      const response = await fetch(`https://crt.sh/?q=%.${domain}&output=json`, {
-        mode: 'cors',
-        cache: 'no-cache'
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Extract unique subdomains
-        const allNames = data.map(entry => entry.name_value.split('\n')).flat();
-        
-        // Remove wildcard domains and duplicates
-        allNames.filter(name => 
-          !name.includes('*') && 
-          name.includes(domain) &&
-          !name.includes('--') && // Filter out invalid subdomain formats
-          !name.includes('..') &&
-          !name.includes('\\') &&
-          name.match(/^[a-zA-Z0-9.-]+$/) // Only allow alphanumeric, dots and hyphens
-        ).forEach(name => subdomains.add(name));
-        
-        console.log(`Found ${subdomains.size} subdomains from certificate transparency`);
-      } else {
-        console.warn("Certificate transparency response not OK:", response.status);
-      }
-    } catch (error) {
-      console.error("Error with certificate transparency:", error);
-    }
-    
-    // 2. FFuF-style subdomain enumeration with adaptive wordlists
-    try {
-      console.log("Using adaptive wordlist for subdomain fuzzing");
-      let subdomainPrefixes = [...COMPREHENSIVE_WORDLIST];
-      
-      // Add service-specific prefixes if we know the domain (similar to FFuF custom wordlists)
-      for (const [serviceDomain, prefixes] of Object.entries(SERVICE_SPECIFIC_PREFIXES)) {
-        if (domain.includes(serviceDomain)) {
-          console.log(`Adding ${prefixes.length} service-specific prefixes for ${serviceDomain}`);
-          subdomainPrefixes = [...subdomainPrefixes, ...prefixes];
-        }
-      }
-      
-      // Remove duplicates from the prefixes
-      subdomainPrefixes = [...new Set(subdomainPrefixes)];
-      
-      // Process in batches with rate limiting (like FFuF's rate limiting)
-      const batchSize = 5;
-      for (let i = 0; i < subdomainPrefixes.length; i += batchSize) {
-        const batch = subdomainPrefixes.slice(i, i + batchSize);
-        
-        // Process batch in parallel
-        const batchPromises = batch.map(async (prefix) => {
-          const subdomain = `${prefix}.${domain}`;
-          try {
-            await fetch(`https://${subdomain}`, { mode: 'no-cors', method: 'HEAD' });
-            // If no error thrown, add it to our results
-            subdomains.add(subdomain);
-          } catch (e) {
-            // Ignore errors - just means this subdomain doesn't exist or can't be accessed
-          }
-        });
-        
-        await Promise.all(batchPromises);
-        await delay(300); // Rate limiting between batches
-      }
-      
-      console.log(`Found ${subdomains.size} subdomains total after wordlist fuzzing`);
-    } catch (error) {
-      console.error("Error with subdomain wordlist fuzzing:", error);
-    }
-    
-    // 3. Add base domain itself
-    subdomains.add(domain);
-    
-    // 4. Add www if it's not already the base domain
-    if (!domain.startsWith('www.')) {
-      subdomains.add(`www.${domain}`);
-    }
-    
-    // Clean any potentially invalid subdomains before returning
-    const cleanedSubdomains = [...subdomains].filter(subdomain => {
-      // Basic validation to avoid obviously incorrect subdomains
-      return subdomain && 
-        subdomain.includes('.') && 
-        !subdomain.includes('--') &&
-        !subdomain.includes('..') &&
-        !subdomain.includes('\\') &&
-        !subdomain.includes('---') &&
-        !subdomain.match(/[^a-zA-Z0-9.-]/); // Only allow alphanumeric, dots and hyphens
-    });
-    
-    return cleanedSubdomains;
-  } catch (error) {
-    console.error('Error in subdomain fetching:', error);
-    throw error;
   }
 }
