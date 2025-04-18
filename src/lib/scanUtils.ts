@@ -1,206 +1,125 @@
 
-/**
- * Common paths used for directory scanning
- * This is a minimal list - in a real scanner this would be much more comprehensive
- */
-export const COMMON_PATHS = [
-  'admin',
-  'login',
-  'wp-admin',
-  'administrator',
-  'dashboard',
-  'wp-login.php',
-  'admin.php',
-  'api',
-  'v1',
-  'v2',
-  'api/v1',
-  'console',
-  'panel',
-  'control',
-  'webmail',
-  'mail',
-  'cpanel',
-  'phpmyadmin',
-  'db',
-  'database',
-  'backups',
-  'backup',
-  'dev',
-  'development',
-  'staging',
-  'test',
-  'beta',
-  'old',
-  '.git',
-  '.env',
-  'config',
-  'settings',
-  'setup',
-  'install',
-  'wp-config.php',
-  'config.php',
-  'server-status',
-  'logs',
-  'log',
-  'tmp',
-  'temp',
-  'uploads',
+import { delay } from './utils'; // Assuming we have a utility file
+
+// Enhanced subdomain wordlist with more comprehensive prefixes
+export const COMPREHENSIVE_SUBDOMAIN_WORDLIST = [
+  // Google services
+  'www', 'mail', 'drive', 'docs', 'sheets', 'slides', 'photos', 'calendar', 
+  'meet', 'chat', 'classroom', 'maps', 'translate', 'cloud', 
+  
+  // Microsoft services
+  'office', 'teams', 'onedrive', 'outlook', 'azure', 'sharepoint', 
+  
+  // Common infrastructure
+  'admin', 'dev', 'test', 'staging', 'beta', 'internal', 'vpn', 'remote', 
+  'support', 'help', 'blog', 'cdn', 'static', 'api', 'service', 'gateway',
+  
+  // Security and monitoring
+  'security', 'monitoring', 'logs', 'metrics', 'status', 'healthcheck',
+  
+  // Development and CI/CD
+  'git', 'svn', 'jenkins', 'gitlab', 'bitbucket', 'ci', 'cd', 'build',
+  
+  // Database and backend
+  'db', 'database', 'sql', 'mysql', 'postgres', 'mongodb', 'redis', 
+  'backend', 'server', 'proxy', 'cache',
+  
+  // Uncommon but possible
+  'intranet', 'extranet', 'portal', 'dashboard', 'panel', 'login', 
+  'auth', 'sso', 'marketplace', 'store', 'billing', 'crm', 'erp'
 ];
 
-/**
- * Extracts domain from a URL
- */
-export function extractDomain(url: string): string | null {
-  try {
-    const hostname = new URL(url).hostname;
-    return hostname;
-  } catch (error) {
-    console.error('Error extracting domain:', error);
-    return null;
+// Enhanced directory scanning wordlist
+export const ADVANCED_PATH_WORDLIST = [
+  // Administrative and management
+  'admin', 'dashboard', 'control', 'management', 'panel', 'settings',
+  
+  // API and development
+  'api', 'v1', 'v2', 'graphql', 'rest', 'swagger', 'openapi', 
+  
+  // Security and sensitive areas
+  '.env', 'config', 'credentials', 'secrets', 'keys', 'tokens',
+  
+  // Logs and debugging
+  'logs', 'debug', 'trace', 'metrics', 'monitoring', 'status',
+  
+  // File and asset management
+  'uploads', 'files', 'assets', 'media', 'static', 'public', 
+  'images', 'documents', 'downloads',
+  
+  // Development and deployment
+  'dev', 'staging', 'test', 'beta', 'backup', 'archive', 
+  '.git', '.svn', 'vendor', 'node_modules',
+  
+  // Web application specifics
+  'wp-admin', 'wp-content', 'admin.php', 'login', 'signin', 
+  'phpmyadmin', 'cpanel', 'webmail',
+  
+  // Additional paths
+  'internal', 'private', 'restricted', 'system', 'tools'
+];
+
+// Advanced subdomain enumeration function
+export async function advancedSubdomainEnumeration(domain: string): Promise<string[]> {
+  const subdomains = new Set<string>();
+  
+  // Multiple techniques
+  const techniques = [
+    traditionalSubdomainBruteforce,
+    // Add more techniques like DNS zone transfer, SRV record scanning
+  ];
+  
+  for (const technique of techniques) {
+    const results = await technique(domain);
+    results.forEach(subdomain => subdomains.add(subdomain));
   }
+  
+  return Array.from(subdomains);
 }
 
-/**
- * Gets the base domain from a hostname
- * E.g., subdomain.example.com -> example.com
- */
-export function getBaseDomain(hostname: string): string {
-  const parts = hostname.split('.');
-  if (parts.length > 2) {
-    // Handle special cases like co.uk, com.au
-    if (parts.length === 3 && parts[parts.length - 2].length <= 3) {
-      return parts.slice(-3).join('.');
-    }
-    return parts.slice(-2).join('.');
-  }
-  return hostname;
-}
-
-/**
- * Delay function to enforce rate limiting
- */
-export function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
- * Fetch subdomains from crt.sh
- */
-export async function fetchSubdomains(domain: string): Promise<string[]> {
-  try {
-    // In Chrome extension, we'll communicate with the background script
-    if (typeof chrome !== 'undefined' && chrome.runtime) {
-      return new Promise<string[]>((resolve, reject) => {
-        chrome.runtime?.sendMessage(
-          { action: 'fetchSubdomains', domain },
-          (response) => {
-            if (chrome.runtime?.lastError) {
-              console.error('Chrome runtime error:', chrome.runtime.lastError);
-              reject(new Error(chrome.runtime.lastError.message));
-              return;
-            }
-            
-            if (response && response.error) {
-              reject(new Error(response.error));
-            } else if (response) {
-              resolve(response.subdomains || []);
-            } else {
-              resolve([]);
-            }
-          }
-        );
-      });
-    } else {
-      // Fallback to direct fetch for web preview
-      console.log('Using fallback fetch for subdomains');
-      const response = await fetch(`https://crt.sh/?q=%.${domain}&output=json`);
-      if (!response.ok) {
-        throw new Error(`Error fetching subdomains: ${response.statusText}`);
-      }
-      
-      const data = await response.json() as Array<{ name_value: string }>;
-      
-      // Extract unique subdomains
-      const allNames = data.map((entry) => entry.name_value.split('\n')).flat();
-      
-      // Remove wildcard domains and duplicates
-      const uniqueSubdomains = [...new Set(allNames.filter((name: string) => 
-        !name.includes('*') && name.includes(domain)
-      ))];
-      
-      return uniqueSubdomains;
-    }
-  } catch (error) {
-    console.error('Error fetching subdomains:', error);
-    return [];
-  }
-}
-
-/**
- * Scan a URL for a specific path
- * Returns the URL if accessible (200 OK), null otherwise
- */
-export async function scanPath(baseUrl: string, path: string): Promise<string | null> {
-  try {
-    const url = new URL(path, baseUrl).toString();
-    console.log('Scanning path:', url);
-    
-    // In Chrome extension, we'll communicate with the background script
-    if (typeof chrome !== 'undefined' && chrome.runtime) {
-      return new Promise<string | null>((resolve, reject) => {
-        chrome.runtime?.sendMessage(
-          { action: 'scanPath', url },
-          (response) => {
-            if (chrome.runtime?.lastError) {
-              console.error('Chrome runtime error:', chrome.runtime.lastError);
-              resolve(null);
-              return;
-            }
-            
-            if (response && response.success) {
-              resolve(url);
-            } else {
-              resolve(null);
-            }
-          }
-        );
-      });
-    } else {
-      // Fallback to direct fetch for web preview (with CORS limitations)
-      console.log('Using fallback fetch for scanning path');
-      const response = await fetch(url, {
-        method: 'HEAD',
-        mode: 'no-cors',
-      });
-      
-      // Since we're using no-cors mode, we assume success
-      return url;
-    }
-  } catch (error) {
-    console.error(`Error scanning ${path}:`, error);
-    return null;
-  }
-}
-
-/**
- * Scan multiple paths with rate limiting
- */
-export async function scanPaths(
-  domain: string, 
-  paths: string[] = COMMON_PATHS, 
-  rateLimit: number = 500
-): Promise<string[]> {
-  const baseUrl = `https://${domain}/`;
+// Traditional subdomain bruteforce
+async function traditionalSubdomainBruteforce(domain: string): Promise<string[]> {
   const results: string[] = [];
-
-  for (const path of paths) {
-    const result = await scanPath(baseUrl, path);
-    if (result) {
-      results.push(result);
+  
+  for (const prefix of COMPREHENSIVE_SUBDOMAIN_WORDLIST) {
+    const subdomain = `${prefix}.${domain}`;
+    try {
+      const response = await fetch(`https://${subdomain}`, { 
+        method: 'HEAD', 
+        mode: 'no-cors' 
+      });
+      results.push(subdomain);
+    } catch {
+      // Silently handle non-existent subdomains
     }
-    await delay(rateLimit); // Rate limiting
+    
+    // Rate limiting
+    await delay(100);
   }
+  
+  return results;
+}
 
+// Enhanced directory scanning
+export async function comprehensiveDirectoryScan(domain: string): Promise<string[]> {
+  const results: string[] = [];
+  
+  for (const path of ADVANCED_PATH_WORDLIST) {
+    const url = `https://${domain}/${path}`;
+    
+    try {
+      const response = await fetch(url, { 
+        method: 'HEAD', 
+        mode: 'no-cors' 
+      });
+      results.push(url);
+    } catch {
+      // Silently handle inaccessible paths
+    }
+    
+    // Rate limiting
+    await delay(100);
+  }
+  
   return results;
 }

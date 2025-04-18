@@ -254,3 +254,44 @@ async function fetchSubdomains(domain) {
     throw error;
   }
 }
+
+// Advanced subdomain enumeration function
+async function advancedSubdomainEnumeration(domain) {
+  const subdomains = new Set();
+  
+  // Multiple techniques
+  const techniques = [
+    traditionalSubdomainBruteforce,
+    // Add more techniques like DNS zone transfer, SRV record scanning
+  ];
+  
+  for (const technique of techniques) {
+    const results = await technique(domain);
+    results.forEach(subdomain => subdomains.add(subdomain));
+  }
+  
+  return Array.from(subdomains);
+}
+
+// Traditional subdomain bruteforce
+async function traditionalSubdomainBruteforce(domain) {
+  const results = [];
+  
+  for (const prefix of COMMON_SUBDOMAIN_PREFIXES) {
+    const subdomain = `${prefix}.${domain}`;
+    try {
+      const response = await fetch(`https://${subdomain}`, { 
+        method: 'HEAD', 
+        mode: 'no-cors' 
+      });
+      results.push(subdomain);
+    } catch {
+      // Silently handle non-existent subdomains
+    }
+    
+    // Rate limiting
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
+  return results;
+}
