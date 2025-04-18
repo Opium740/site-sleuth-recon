@@ -13,7 +13,8 @@
     }
   },
   "permissions": [
-    "activeTab"
+    "activeTab",
+    "downloads"
   ],
   "host_permissions": [
     "https://*/*"

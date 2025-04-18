@@ -116,6 +116,17 @@
         margin-bottom: 4px;
         font-size: 12px;
         word-break: break-all;
+        transition: background-color 0.2s;
+      }
+      .result-item:hover {
+        background-color: #e5e7eb;
+      }
+      .result-item a {
+        color: #4f46e5;
+        text-decoration: none;
+      }
+      .result-item a:hover {
+        text-decoration: underline;
       }
       .warning {
         margin-bottom: 16px;
@@ -141,6 +152,13 @@
       .footer {
         font-size: 11px;
         color: #6b7280;
+      }
+      .save-button {
+        margin-top: 10px;
+        background-color: #10b981;
+      }
+      .save-button:hover {
+        background-color: #059669;
       }
     </style>
   </head>
@@ -174,6 +192,7 @@
           <div class="result-list">
             <h3>Subdomains (<span id="subdomain-count">0</span>)</h3>
             <div id="subdomain-results"></div>
+            <!-- Save button will be added here by JavaScript -->
           </div>
         </div>
         
@@ -182,13 +201,14 @@
           <div class="result-list">
             <h3>Directories (<span id="directory-count">0</span>)</h3>
             <div id="directory-results"></div>
+            <!-- Save button will be added here by JavaScript -->
           </div>
         </div>
         
         <div class="separator"></div>
         
         <div class="footer">
-          Use the extension on any website to scan for subdomains and common directories.
+          Use the extension on any website to scan for subdomains and common directories. Results will persist until you close the extension.
         </div>
       </div>
     </div>
