@@ -1,3 +1,4 @@
+
 // Background service worker for Site Sleuth Recon
 console.log("Site Sleuth Recon background service worker initialized");
 
@@ -164,7 +165,7 @@ async function fetchSubdomains(domain) {
   }
 }
 
-// Modified directory scanning to use custom wordlist
+// Modified directory scanning to use custom wordlist and filter by status code
 async function scanDirectories(domain) {
   try {
     const customPaths = await loadWordlist('directories.txt');
@@ -177,10 +178,22 @@ async function scanDirectories(domain) {
       const url = `https://${domain}/${path}`;
       
       try {
-        // Check if path exists using HEAD request with no-cors mode
-        const response = await fetch(url, { method: 'HEAD', mode: 'no-cors' });
-        results.push(url);
-      } catch {
+        // Use fetch with full response to get status code and length
+        const response = await fetch(url, { method: 'GET' });
+        const status = response.status;
+        const contentLength = response.headers.get('content-length') || '0';
+        const text = await response.text();
+        const actualLength = text.length;
+        
+        // Only include 200 OK and 302 Found responses
+        if (status === 200 || status === 302) {
+          results.push({
+            url,
+            status,
+            contentLength: contentLength !== '0' ? parseInt(contentLength) : actualLength
+          });
+        }
+      } catch (error) {
         // Silently handle inaccessible paths
       }
       
@@ -191,7 +204,7 @@ async function scanDirectories(domain) {
     return results;
   } catch (error) {
     console.error('Error loading directory wordlist:', error);
-    return COMMON_PATHS; // Fallback to built-in paths
+    return []; // Return empty results on error
   }
 }
 
@@ -223,6 +236,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ error: error.message, subdomains: [] });
       });
     return true; // Indicates we'll respond asynchronously
+  } else if (message.action === "scanDirectories") {
+    console.log("Scanning directories for:", message.domain);
+    scanDirectories(message.domain)
+      .then(directories => {
+        console.log("Found directories:", directories.length);
+        sendResponse({ directories });
+      })
+      .catch(error => {
+        console.error("Directory scan error:", error);
+        sendResponse({ error: error.message, directories: [] });
+      });
+    return true; // Indicates we'll respond asynchronously
   } else if (message.action === "saveToFile") {
     console.log("Saving data to file:", message.data.length, "items");
     const blob = new Blob([message.data.join('\n')], { type: 'text/plain' });
@@ -243,16 +268,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function fetchUrl(url) {
   try {
     console.log("Fetching URL:", url);
-    const response = await fetch(url, { 
-      method: 'HEAD',
-      mode: 'no-cors' // Fix CORS issues by using no-cors mode
-    });
+    const response = await fetch(url);
     
-    // Since no-cors returns opaque responses, we can't access status
-    // We'll consider it a success if the fetch doesn't throw an error
+    // Get response status and length
+    const status = response.status;
+    const contentLength = response.headers.get('content-length') || '0';
+    const text = await response.text();
+    const actualLength = text.length;
+    
     return { 
       url, 
-      success: true
+      success: true,
+      status,
+      contentLength: contentLength !== '0' ? parseInt(contentLength) : actualLength
     };
   } catch (error) {
     console.error(`Error fetching ${url}:`, error);

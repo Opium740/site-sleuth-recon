@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -117,16 +116,26 @@
         font-size: 12px;
         word-break: break-all;
         transition: background-color 0.2s;
-      }
-      .result-item:hover {
-        background-color: #e5e7eb;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
       }
       .result-item a {
         color: #4f46e5;
         text-decoration: none;
+        flex: 1;
+        min-width: 60%;
       }
       .result-item a:hover {
         text-decoration: underline;
+      }
+      .status-badge,
+      .length-badge {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 10px;
+        margin-left: 4px;
       }
       .warning {
         margin-bottom: 16px;

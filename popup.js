@@ -1,4 +1,3 @@
-
 // Common paths used for directory scanning - enhanced wordlist
 const COMMON_PATHS = [
   'admin', 'login', 'wp-admin', 'administrator', 'dashboard', 'wp-login.php',
@@ -170,7 +169,7 @@ function setLoading(operation, loading) {
   }
 }
 
-// Function to update results UI with clickable links
+// Function to update results UI with clickable links and additional information
 function updateResults(elementId, countId, results) {
   const container = document.getElementById(elementId);
   const countElement = document.getElementById(countId);
@@ -187,24 +186,60 @@ function updateResults(elementId, countId, results) {
     const item = document.createElement('div');
     item.className = 'result-item';
     
-    // Make all results clickable
-    const link = document.createElement('a');
-    
-    // If result doesn't start with http, add the protocol
-    let url = result;
-    if (!url.startsWith('http')) {
-      url = 'https://' + url;
+    // For directory results with status and length information
+    if (typeof result === 'object' && result.url) {
+      const link = document.createElement('a');
+      link.href = result.url;
+      link.textContent = result.url;
+      link.target = '_blank';
+      link.style.color = '#4f46e5';
+      link.style.textDecoration = 'none';
+      
+      // Create status code and length badges
+      const statusBadge = document.createElement('span');
+      statusBadge.className = 'status-badge';
+      statusBadge.textContent = `Status: ${result.status}`;
+      statusBadge.style.backgroundColor = result.status === 200 ? '#10b981' : '#f59e0b';
+      statusBadge.style.color = 'white';
+      statusBadge.style.padding = '2px 6px';
+      statusBadge.style.borderRadius = '4px';
+      statusBadge.style.fontSize = '10px';
+      statusBadge.style.marginLeft = '8px';
+      
+      const lengthBadge = document.createElement('span');
+      lengthBadge.className = 'length-badge';
+      lengthBadge.textContent = `Length: ${result.contentLength}`;
+      lengthBadge.style.backgroundColor = '#6b7280';
+      lengthBadge.style.color = 'white';
+      lengthBadge.style.padding = '2px 6px';
+      lengthBadge.style.borderRadius = '4px';
+      lengthBadge.style.fontSize = '10px';
+      lengthBadge.style.marginLeft = '4px';
+      
+      item.appendChild(link);
+      item.appendChild(statusBadge);
+      item.appendChild(lengthBadge);
+    } else {
+      // Simple string result (subdomains)
+      const link = document.createElement('a');
+      
+      // If result doesn't start with http, add the protocol
+      let url = result;
+      if (!url.startsWith('http')) {
+        url = 'https://' + url;
+      }
+      
+      link.href = url;
+      link.textContent = result;
+      link.target = '_blank';
+      link.style.color = '#4f46e5';
+      link.style.textDecoration = 'none';
+      link.style.display = 'block';
+      link.style.width = '100%';
+      
+      item.appendChild(link);
     }
     
-    link.href = url;
-    link.textContent = result;
-    link.target = '_blank';
-    link.style.color = '#4f46e5';
-    link.style.textDecoration = 'none';
-    link.style.display = 'block';
-    link.style.width = '100%';
-    
-    item.appendChild(link);
     container.appendChild(item);
   });
 }
@@ -316,7 +351,7 @@ function handleSubdomainScan() {
   );
 }
 
-// Function to scan directories
+// Function to scan directories with improved filtering
 function handleDirectoryScan() {
   if (!currentDomain) {
     showToast("Error", "No domain detected to scan", "error");
@@ -326,55 +361,41 @@ function handleDirectoryScan() {
   setLoading('directories', true);
   console.log(`Scanning directories for: ${currentDomain}`);
   
-  // Store found directories
-  scannedDirectories = [];
-  let completedScans = 0;
-  
-  // Show progress toast
-  showToast("Scan Started", `Scanning ${COMMON_PATHS.length} directories...`);
-  
-  // Scan each path
-  COMMON_PATHS.forEach(path => {
-    const url = `https://${currentDomain}/${path}`;
-    
-    chrome.runtime.sendMessage(
-      { action: 'scanPath', url },
-      (response) => {
-        completedScans++;
+  // Use the new scanDirectories function from background.js
+  chrome.runtime.sendMessage(
+    { action: 'scanDirectories', domain: currentDomain },
+    (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('Chrome runtime error:', chrome.runtime.lastError);
+        showToast("Error", "Extension error: " + chrome.runtime.lastError.message, "error");
+        setLoading('directories', false);
+        return;
+      }
+      
+      if (response && response.error) {
+        console.error("Error during directory scan:", response.error);
+        showToast("Scan Failed", "Error scanning directories: " + response.error, "error");
+      } else if (response && response.directories) {
+        scannedDirectories = response.directories;
+        console.log(`Found ${scannedDirectories.length} accessible directories`);
+        updateResults('directory-results', 'directory-count', scannedDirectories);
         
-        if (chrome.runtime.lastError) {
-          console.error('Chrome runtime error:', chrome.runtime.lastError);
-          // Continue with other scans
-        } else if (response && response.success) {
-          scannedDirectories.push(url);
-          // Update results in real-time
-          updateResults('directory-results', 'directory-count', scannedDirectories);
-        }
+        // Enable save button if results found
+        saveDirectoriesButton.disabled = scannedDirectories.length === 0;
         
-        // Check if all scans are complete
-        if (completedScans === COMMON_PATHS.length) {
-          console.log(`Found ${scannedDirectories.length} accessible directories`);
-          
-          // Enable save button if results found
-          saveDirectoriesButton.disabled = scannedDirectories.length === 0;
-          
-          // Save the results to Chrome storage
-          saveStateToChromeStorage();
-          
-          if (scannedDirectories.length > 0) {
-            showToast("Scan Complete", `Found ${scannedDirectories.length} accessible directories`);
-          } else {
-            showToast("No Results", "No accessible directories found");
-          }
-          
-          setLoading('directories', false);
-        } else if (completedScans % 10 === 0) {
-          // Update progress periodically
-          console.log(`Completed ${completedScans}/${COMMON_PATHS.length} directory scans`);
+        // Save the results to Chrome storage
+        saveStateToChromeStorage();
+        
+        if (scannedDirectories.length > 0) {
+          showToast("Scan Complete", `Found ${scannedDirectories.length} accessible directories`);
+        } else {
+          showToast("No Results", "No accessible directories found");
         }
       }
-    );
-  });
+      
+      setLoading('directories', false);
+    }
+  );
 }
 
 // Function to save results between extension sessions
