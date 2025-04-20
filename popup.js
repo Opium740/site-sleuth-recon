@@ -1,35 +1,3 @@
-// Common paths used for directory scanning - enhanced wordlist
-const COMMON_PATHS = [
-  'admin', 'login', 'wp-admin', 'administrator', 'dashboard', 'wp-login.php',
-  'admin.php', 'api', 'v1', 'v2', 'api/v1', 'console', 'panel', 'control',
-  'webmail', 'mail', 'cpanel', 'phpmyadmin', 'db', 'database', 'backups',
-  'backup', 'dev', 'development', 'staging', 'test', 'beta', 'old', '.git',
-  '.env', 'config', 'settings', 'setup', 'install', 'wp-config.php', 'config.php',
-  'server-status', 'logs', 'log', 'tmp', 'temp', 'uploads', 'download', 'public',
-  'private', 'wp-content', 'wp-includes', 'images', 'img', 'js', 'css', 'assets',
-  'plugins', 'themes', 'files', 'docs', 'documentation', 'forum', 'forums',
-  'blog', 'blogs', 'shop', 'store', 'cart', 'checkout', 'account', 'members',
-  'member', 'user', 'users', 'profile', 'billing', 'payment', 'payments',
-  'order', 'orders', 'product', 'products', 'category', 'categories', 'tag',
-  'tags', 'comment', 'comments', 'search', 'wp-json', 'api/graphql', 'graphql',
-  'wp', 'wordpress', 'joomla', 'drupal', 'magento', 'index.php', 'home', 'site',
-  'local', 'media', 'news', 'archive', 'old-site', 'new-site', 'test-site',
-  'demo', 'rss', 'xml', 'sitemap', 'sitemap.xml', 'robots.txt', 'license',
-  'CHANGELOG', 'README', '.htaccess', '.svn', 'vendor', 'node_modules',
-  'composer.json', 'package.json', '.DS_Store', 'cgi-bin', 'services', 'editor',
-  'auth', 'sign-in', 'login.php', 'signin', 'signup', 'register', 'forgotten-password',
-  'reset-password', 'password-reset', 'recover', 'recovery',
-  // Additional paths
-  'api/v3', 'auth/login', 'portal/login', 'dashboard/admin', 'wp-json/wp/v2',
-  'admin/login', 'administrator/index.php', 'wp/wp-admin', 'cms', 'cms/admin',
-  'static', 'static/js', 'static/css', 'static/images', 'static/fonts',
-  'assets/js', 'assets/css', 'assets/images', 'assets/fonts',
-  'login/oauth', 'system', 'app/config', 'app/settings', 'api/token',
-  'api/auth', 'health', 'status/health', 'metrics', 'prometheus',
-  'help/support', 'support/contact', 'contact', 'about', 'about-us',
-  'terms', 'privacy', 'jobs', 'career', 'press', 'news/press',
-  'investors', 'partners', 'affiliate', 'legal', 'tos'
-];
 
 // DOM elements
 const currentDomainElement = document.getElementById('current-domain');
@@ -41,8 +9,6 @@ const subdomainCount = document.getElementById('subdomain-count');
 const directoryCount = document.getElementById('directory-count');
 const tabs = document.querySelectorAll('.tab');
 const tabContents = document.querySelectorAll('.tab-content');
-const saveSubdomainsButton = document.createElement('button');
-const saveDirectoriesButton = document.createElement('button');
 
 // Variables to track state
 let currentDomain = null;
@@ -52,56 +18,19 @@ let scannedSubdomains = [];
 let scannedDirectories = [];
 
 // Setup save buttons
-function setupSaveButtons() {
-  // Configure subdomain save button
-  saveSubdomainsButton.className = 'button save-button';
-  saveSubdomainsButton.textContent = 'Save to File';
-  saveSubdomainsButton.style.marginTop = '10px';
-  saveSubdomainsButton.style.backgroundColor = '#10b981';
-  saveSubdomainsButton.disabled = true;
-  
-  // Configure directory save button
-  saveDirectoriesButton.className = 'button save-button';
-  saveDirectoriesButton.textContent = 'Save to File';
-  saveDirectoriesButton.style.marginTop = '10px';
-  saveDirectoriesButton.style.backgroundColor = '#10b981';
-  saveDirectoriesButton.disabled = true;
-  
-  // Add them to the DOM after the results sections
-  const subdomainTab = document.getElementById('subdomains-tab');
-  const directoryTab = document.getElementById('directories-tab');
-  
-  subdomainTab.querySelector('.result-list').appendChild(saveSubdomainsButton);
-  directoryTab.querySelector('.result-list').appendChild(saveDirectoriesButton);
-  
-  // Add event listeners
-  saveSubdomainsButton.addEventListener('click', () => saveToFile(scannedSubdomains, `${currentDomain}-subdomains.txt`));
-  saveDirectoriesButton.addEventListener('click', () => saveToFile(scannedDirectories, `${currentDomain}-directories.txt`));
-}
+const saveSubdomainsButton = document.createElement('button');
+saveSubdomainsButton.className = 'button save-button';
+saveSubdomainsButton.textContent = 'Save to File';
+saveSubdomainsButton.style.marginTop = '10px';
+saveSubdomainsButton.style.backgroundColor = '#10b981';
+saveSubdomainsButton.disabled = true;
 
-// Function to save results to a file
-function saveToFile(data, filename) {
-  if (!data || data.length === 0) {
-    showToast("Error", "No data to save", "error");
-    return;
-  }
-  
-  chrome.runtime.sendMessage(
-    { 
-      action: 'saveToFile', 
-      data: data,
-      filename: filename
-    },
-    (response) => {
-      if (chrome.runtime.lastError) {
-        console.error('Error saving file:', chrome.runtime.lastError);
-        showToast("Error", "Failed to save file: " + chrome.runtime.lastError.message, "error");
-      } else if (response && response.success) {
-        showToast("Success", "File saved successfully");
-      }
-    }
-  );
-}
+const saveDirectoriesButton = document.createElement('button');
+saveDirectoriesButton.className = 'button save-button';
+saveDirectoriesButton.textContent = 'Save to File';
+saveDirectoriesButton.style.marginTop = '10px';
+saveDirectoriesButton.style.backgroundColor = '#10b981';
+saveDirectoriesButton.disabled = true;
 
 // Function to show a toast notification
 function showToast(title, message, type = 'info') {
@@ -260,18 +189,28 @@ function setupTabs() {
   });
 }
 
-// Function to clean and validate subdomain results
-function cleanSubdomainResults(subdomains) {
-  return subdomains.filter(subdomain => {
-    // Basic validation to avoid obviously incorrect subdomains
-    return subdomain && 
-      subdomain.includes('.') && 
-      !subdomain.includes('--') &&
-      !subdomain.includes('..') &&
-      !subdomain.includes('\\') &&
-      !subdomain.includes('---') &&
-      subdomain.match(/^[a-zA-Z0-9.-]+$/); // Only allow alphanumeric, dots and hyphens
-  });
+// Function to save results to file
+function saveToFile(data, filename) {
+  if (!data || data.length === 0) {
+    showToast("Error", "No data to save", "error");
+    return;
+  }
+  
+  chrome.runtime.sendMessage(
+    { 
+      action: 'saveToFile', 
+      data: data,
+      filename: filename
+    },
+    (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('Error saving file:', chrome.runtime.lastError);
+        showToast("Error", "Failed to save file: " + chrome.runtime.lastError.message, "error");
+      } else if (response && response.success) {
+        showToast("Success", "File saved successfully");
+      }
+    }
+  );
 }
 
 // Function to get the current tab's domain
@@ -291,6 +230,8 @@ function getCurrentDomain() {
           
           // Load any saved results for this domain
           loadStateFromChromeStorage(domain);
+        } else {
+          showToast("Error", "Could not detect a valid domain", "error");
         }
       } else {
         console.log("No URL found in current tab");
@@ -329,8 +270,8 @@ function handleSubdomainScan() {
         console.error("Error during subdomain scan:", response.error);
         showToast("Scan Failed", "Error scanning subdomains: " + response.error, "error");
       } else if (response && response.subdomains) {
-        scannedSubdomains = cleanSubdomainResults(response.subdomains);
-        console.log(`Found ${scannedSubdomains.length} subdomains after cleaning`);
+        scannedSubdomains = response.subdomains;
+        console.log(`Found ${scannedSubdomains.length} subdomains`);
         updateResults('subdomain-results', 'subdomain-count', scannedSubdomains);
         
         // Enable save button if results found
@@ -351,7 +292,7 @@ function handleSubdomainScan() {
   );
 }
 
-// Function to scan directories with improved filtering
+// Function to scan directories
 function handleDirectoryScan() {
   if (!currentDomain) {
     showToast("Error", "No domain detected to scan", "error");
@@ -361,7 +302,6 @@ function handleDirectoryScan() {
   setLoading('directories', true);
   console.log(`Scanning directories for: ${currentDomain}`);
   
-  // Use the new scanDirectories function from background.js
   chrome.runtime.sendMessage(
     { action: 'scanDirectories', domain: currentDomain },
     (response) => {
@@ -438,12 +378,24 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchSubdomainsButton.disabled = true;
   directoryScanButton.disabled = true;
   
-  // Set up UI elements
-  setupSaveButtons();
+  // Add save buttons to the DOM
+  document.getElementById('subdomains-tab')
+    .querySelector('.result-list')
+    .appendChild(saveSubdomainsButton);
+  
+  document.getElementById('directories-tab')
+    .querySelector('.result-list')
+    .appendChild(saveDirectoriesButton);
   
   // Set up event listeners
   fetchSubdomainsButton.addEventListener('click', handleSubdomainScan);
   directoryScanButton.addEventListener('click', handleDirectoryScan);
+  saveSubdomainsButton.addEventListener('click', () => 
+    saveToFile(scannedSubdomains, `${currentDomain}-subdomains.txt`)
+  );
+  saveDirectoriesButton.addEventListener('click', () => 
+    saveToFile(scannedDirectories.map(d => d.url), `${currentDomain}-directories.txt`)
+  );
   
   // Setup tabs
   setupTabs();

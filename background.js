@@ -2,81 +2,6 @@
 // Background service worker for Site Sleuth Recon
 console.log("Site Sleuth Recon background service worker initialized");
 
-// Enhanced wordlist with Google-specific services - similar to FFuF wordlists
-const COMPREHENSIVE_WORDLIST = [
-  // Google-specific services
-  'drive', 'mail', 'maps', 'photos', 'calendar', 'accounts', 'play', 'meet', 'chat',
-  'classroom', 'cloud', 'translate', 'myaccount', 'domains', 'sites', 'groups',
-  'hangouts', 'pay', 'scholar', 'books', 'earth', 'analytics',
-  
-  // Microsoft-specific services
-  'onedrive', 'office', 'teams', 'outlook', 'azure', 'bing', 'live', 'account',
-  
-  // Common infrastructure
-  'www', 'admin', 'dev', 'test', 'staging', 'beta', 'internal', 'vpn', 'remote', 
-  'support', 'help', 'blog', 'cdn', 'static', 'api', 'service', 'gateway',
-  
-  // Security and monitoring
-  'security', 'monitoring', 'logs', 'metrics', 'status', 'healthcheck',
-  
-  // Development and CI/CD
-  'git', 'svn', 'jenkins', 'gitlab', 'bitbucket', 'ci', 'cd', 'build',
-  
-  // Database and backend
-  'db', 'database', 'sql', 'mysql', 'postgres', 'mongodb', 'redis', 
-  'backend', 'server', 'proxy', 'cache',
-  
-  // Common subdomains
-  'intranet', 'extranet', 'portal', 'dashboard', 'panel', 'login', 
-  'auth', 'sso', 'marketplace', 'store', 'billing', 'crm', 'erp',
-  'help', 'support', 'kb', 'faq', 'feedback', 'community', 'developer',
-  'affiliate', 'partners', 'careers', 'jobs', 'about', 'contact', 'learn',
-  'training', 'video', 'audio', 'music', 'tv', 'streaming', 'press', 'investor',
-  'security', 'privacy', 'legal', 'terms', 'careers', 'blog', 'status'
-];
-
-// Service-specific subdomain prefixes (like Amass configuration)
-const SERVICE_SPECIFIC_PREFIXES = {
-  'google.com': [
-    'mail', 'drive', 'docs', 'photos', 'calendar', 'meet', 'chat', 'maps',
-    'translate', 'accounts', 'myaccount', 'contacts', 'keep', 'classroom',
-    'cloud', 'analytics', 'developers', 'play', 'support', 'domains', 'admin',
-    'groups', 'sites', 'hangouts', 'chrome', 'store', 'pay', 'scholar', 'trends',
-    'books', 'earth', 'finance'
-  ],
-  'microsoft.com': [
-    'outlook', 'office', 'teams', 'onedrive', 'azure', 'windows', 'account',
-    'docs', 'support', 'learn', 'developer', 'techcommunity', 'partner', 'msdn'
-  ],
-  'github.com': [
-    'gist', 'api', 'education', 'pages', 'status', 'support', 'enterprise',
-    'training', 'classroom', 'docs'
-  ]
-};
-
-// Path wordlist for directory fuzzing (like FFuF paths.txt)
-const COMMON_PATHS = [
-  'admin', 'login', 'wp-admin', 'administrator', 'dashboard', 'wp-login.php',
-  'admin.php', 'api', 'v1', 'v2', 'api/v1', 'console', 'panel', 'control',
-  'webmail', 'mail', 'cpanel', 'phpmyadmin', 'db', 'database', 'backups',
-  'backup', 'dev', 'development', 'staging', 'test', 'beta', 'old', '.git',
-  '.env', 'config', 'settings', 'setup', 'install', 'wp-config.php', 'config.php',
-  'server-status', 'logs', 'log', 'tmp', 'temp', 'uploads', 'download', 'public',
-  'private', 'wp-content', 'wp-includes', 'images', 'img', 'js', 'css', 'assets',
-  'plugins', 'themes', 'files', 'docs', 'documentation', 'forum', 'forums',
-  'blog', 'blogs', 'shop', 'store', 'cart', 'checkout', 'account', 'members',
-  'member', 'user', 'users', 'profile', 'billing', 'payment', 'payments',
-  'order', 'orders', 'product', 'products', 'category', 'categories', 'tag',
-  'tags', 'comment', 'comments', 'search', 'wp-json', 'api/graphql', 'graphql',
-  'wp', 'wordpress', 'joomla', 'drupal', 'magento', 'index.php', 'home', 'site',
-  'local', 'media', 'news', 'archive', 'old-site', 'new-site', 'test-site',
-  'demo', 'rss', 'xml', 'sitemap', 'sitemap.xml', 'robots.txt', 'license',
-  'CHANGELOG', 'README', '.htaccess', '.svn', 'vendor', 'node_modules',
-  'composer.json', 'package.json', '.DS_Store', 'cgi-bin', 'services', 'editor',
-  'auth', 'sign-in', 'login.php', 'signin', 'signup', 'register', 'forgotten-password',
-  'reset-password', 'password-reset', 'recover', 'recovery'
-];
-
 // Utility function for rate-limited fetching
 async function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -86,7 +11,10 @@ async function delay(ms) {
 async function loadWordlist(filename) {
   try {
     const response = await fetch(chrome.runtime.getURL(`wordlists/${filename}`));
-    if (!response.ok) throw new Error('Failed to load wordlist');
+    if (!response.ok) {
+      console.error(`Failed to load wordlist ${filename}: ${response.status}`);
+      return [];
+    }
     const text = await response.text();
     return text.split('\n').filter(line => 
       line && !line.startsWith('#') && line.trim()
@@ -97,48 +25,41 @@ async function loadWordlist(filename) {
   }
 }
 
-// Modified fetchSubdomains function to use external wordlists
+// Fallback wordlists if custom ones aren't available
+const FALLBACK_SUBDOMAINS = [
+  'www', 'mail', 'webmail', 'admin', 'intranet', 'vpn', 'test', 'dev',
+  'staging', 'beta', 'api', 'cdn', 'shop', 'blog', 'support', 'secure',
+  'portal', 'services', 'login', 'forum', 'help', 'app', 'docs'
+];
+
+const FALLBACK_DIRECTORIES = [
+  'admin', 'login', 'wp-admin', 'dashboard', 'wp-login.php', 'upload',
+  'api', 'backup', 'dev', 'test', 'staging', '.git', 'config', 'settings',
+  'images', 'img', 'css', 'js', 'assets', 'files', 'docs'
+];
+
+// Function to fetch subdomains using external wordlists
 async function fetchSubdomains(domain) {
   try {
-    console.log("Fetching from multiple sources for domain:", domain);
+    console.log("Fetching subdomains for domain:", domain);
     const subdomains = new Set();
     
-    // 1. Load and use custom wordlists
-    const customWordlist = await loadWordlist('subdomains.txt');
-    console.log(`Loaded ${customWordlist.length} entries from custom wordlist`);
+    // Add the main domain
+    subdomains.add(domain);
     
-    if (customWordlist.length > 0) {
-      // Process custom wordlist entries
-      const batchSize = 5;
-      for (let i = 0; i < customWordlist.length; i += batchSize) {
-        const batch = customWordlist.slice(i, i + batchSize);
-        const batchPromises = batch.map(async (prefix) => {
-          const subdomain = `${prefix}.${domain}`;
-          try {
-            await fetch(`https://${subdomain}`, { mode: 'no-cors', method: 'HEAD' });
-            subdomains.add(subdomain);
-          } catch (e) {
-            // Subdomain not accessible
-          }
-        });
-        
-        await Promise.all(batchPromises);
-        await delay(300); // Rate limiting
-      }
-    }
-    
-    // 2. Certificate transparency logs (keep this as backup)
+    // 1. Try certificate transparency logs
     try {
-      console.log("Fetching from certificate transparency logs");
-      const response = await fetch(`https://crt.sh/?q=%.${domain}&output=json`, {
-        mode: 'cors',
-        cache: 'no-cache'
-      });
+      console.log("Fetching from certificate transparency logs (crt.sh)");
+      const response = await fetch(`https://crt.sh/?q=%.${domain}&output=json`);
       
       if (response.ok) {
         const data = await response.json();
+        console.log(`Received ${data.length} entries from crt.sh`);
+        
+        // Extract unique subdomains
         const allNames = data.map(entry => entry.name_value.split('\n')).flat();
         
+        // Filter and add valid subdomains
         allNames.filter(name => 
           !name.includes('*') && 
           name.includes(domain) &&
@@ -147,64 +68,146 @@ async function fetchSubdomains(domain) {
           !name.includes('\\') &&
           name.match(/^[a-zA-Z0-9.-]+$/)
         ).forEach(name => subdomains.add(name));
+        
+        console.log(`Found ${subdomains.size} subdomains from certificate transparency`);
+      } else {
+        console.warn("Certificate transparency response not OK:", response.status);
       }
     } catch (error) {
       console.error("Error with certificate transparency:", error);
     }
     
-    // Clean and return results
-    return Array.from(subdomains).filter(subdomain => 
+    // 2. Custom wordlist approach (like dirbuster)
+    const customWordlist = await loadWordlist('subdomains.txt');
+    const wordlist = customWordlist.length > 0 ? customWordlist : FALLBACK_SUBDOMAINS;
+    console.log(`Using wordlist with ${wordlist.length} entries for subdomain enumeration`);
+    
+    const batchSize = 5;
+    for (let i = 0; i < wordlist.length; i += batchSize) {
+      const batch = wordlist.slice(i, i + batchSize);
+      const batchPromises = batch.map(async (prefix) => {
+        try {
+          const subdomain = `${prefix}.${domain}`;
+          const url = `https://${subdomain}`;
+          console.log(`Checking subdomain: ${subdomain}`);
+          
+          // Try to fetch the subdomain
+          const response = await fetch(url, {
+            method: 'HEAD',
+            mode: 'no-cors',
+            cache: 'no-store',
+            redirect: 'follow',
+            referrerPolicy: 'no-referrer'
+          });
+          
+          // If we reach here, the fetch didn't throw an error
+          console.log(`Subdomain likely exists: ${subdomain}`);
+          subdomains.add(subdomain);
+        } catch (e) {
+          // Subdomain likely doesn't exist or is blocked
+          console.log(`Subdomain error or doesn't exist`);
+        }
+      });
+      
+      await Promise.all(batchPromises);
+      await delay(300); // Rate limiting
+    }
+    
+    // Return unique and valid subdomains
+    const result = Array.from(subdomains).filter(subdomain => 
       subdomain && 
       subdomain.includes('.') && 
-      !subdomain.includes('--') &&
       !subdomain.match(/[^a-zA-Z0-9.-]/)
     );
+    
+    console.log(`Returning ${result.length} subdomains`);
+    return result;
   } catch (error) {
-    console.error('Error in subdomain fetching:', error);
+    console.error('Error fetching subdomains:', error);
     throw error;
   }
 }
 
-// Modified directory scanning to use custom wordlist and filter by status code
+// Function to scan directories and return only 200 and 302 responses with response length
 async function scanDirectories(domain) {
   try {
+    console.log(`Starting directory scan for domain: ${domain}`);
     const customPaths = await loadWordlist('directories.txt');
-    const paths = customPaths.length > 0 ? customPaths : COMMON_PATHS;
+    const paths = customPaths.length > 0 ? customPaths : FALLBACK_DIRECTORIES;
+    console.log(`Using wordlist with ${paths.length} entries for directory scanning`);
     
     const results = [];
-  
-    // Use advanced path wordlist for directory fuzzing (like FFuF)
-    for (const path of paths) {
-      const url = `https://${domain}/${path}`;
-      
-      try {
-        // Use fetch with full response to get status code and length
-        const response = await fetch(url, { method: 'GET' });
-        const status = response.status;
-        const contentLength = response.headers.get('content-length') || '0';
-        const text = await response.text();
-        const actualLength = text.length;
+    const batchSize = 5;
+    
+    for (let i = 0; i < paths.length; i += batchSize) {
+      const batch = paths.slice(i, i + batchSize);
+      const batchPromises = batch.map(async (path) => {
+        const url = `https://${domain}/${path}`;
+        console.log(`Checking path: ${url}`);
         
-        // Only include 200 OK and 302 Found responses
-        if (status === 200 || status === 302) {
-          results.push({
-            url,
-            status,
-            contentLength: contentLength !== '0' ? parseInt(contentLength) : actualLength
+        try {
+          // Use fetch with full response to get status code and length
+          const response = await fetch(url, { 
+            method: 'GET',
+            cache: 'no-store',
+            redirect: 'follow'
           });
+          
+          const status = response.status;
+          console.log(`Path ${url} returned status: ${status}`);
+          
+          // Only include 200 OK and 302 Found responses
+          if (status === 200 || status === 302) {
+            const contentLength = response.headers.get('content-length') || '0';
+            const text = await response.text();
+            const actualLength = text.length;
+            
+            results.push({
+              url,
+              status,
+              contentLength: contentLength !== '0' ? parseInt(contentLength) : actualLength
+            });
+            console.log(`Added path to results: ${url} (${status})`);
+          }
+        } catch (error) {
+          // Path is likely inaccessible
+          console.log(`Error checking path ${url}: ${error.message}`);
         }
-      } catch (error) {
-        // Silently handle inaccessible paths
-      }
+      });
       
-      // Rate limiting
-      await delay(100);
+      await Promise.all(batchPromises);
+      await delay(200); // Rate limiting
     }
     
+    console.log(`Directory scan complete, found ${results.length} results`);
     return results;
   } catch (error) {
-    console.error('Error loading directory wordlist:', error);
-    return []; // Return empty results on error
+    console.error('Error scanning directories:', error);
+    return [];
+  }
+}
+
+// Function to fetch a URL and check its status
+async function fetchUrl(url) {
+  try {
+    console.log("Fetching URL:", url);
+    const response = await fetch(url);
+    
+    // Get response status and length
+    const status = response.status;
+    const contentLength = response.headers.get('content-length') || '0';
+    const text = await response.text();
+    const actualLength = text.length;
+    
+    return { 
+      url, 
+      success: true,
+      status,
+      contentLength: contentLength !== '0' ? parseInt(contentLength) : actualLength
+    };
+  } catch (error) {
+    console.error(`Error fetching ${url}:`, error);
+    return { url, error: error.message, success: false };
   }
 }
 
@@ -263,27 +266,3 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Indicates we'll respond asynchronously
   }
 });
-
-// Function to fetch a URL and check its status
-async function fetchUrl(url) {
-  try {
-    console.log("Fetching URL:", url);
-    const response = await fetch(url);
-    
-    // Get response status and length
-    const status = response.status;
-    const contentLength = response.headers.get('content-length') || '0';
-    const text = await response.text();
-    const actualLength = text.length;
-    
-    return { 
-      url, 
-      success: true,
-      status,
-      contentLength: contentLength !== '0' ? parseInt(contentLength) : actualLength
-    };
-  } catch (error) {
-    console.error(`Error fetching ${url}:`, error);
-    return { url, error: error.message, success: false };
-  }
-}
