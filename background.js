@@ -128,6 +128,42 @@ async function fetchSubdomains(domain) {
   }
 }
 
+// Get a baseline 404 response for the domain to detect false 200s
+async function getBaselineFalse200(domain) {
+  try {
+    // Generate a random, almost certainly non-existent path
+    const randomPath = `non-existent-page-${Math.random().toString(36).substring(2, 15)}`;
+    const url = `https://${domain}/${randomPath}`;
+    
+    console.log(`Getting baseline 404 for false 200 detection: ${url}`);
+    
+    const response = await fetch(url, { 
+      cache: 'no-store', 
+      redirect: 'follow' 
+    });
+    
+    // Some servers return custom 404 pages with status 200
+    const isCustom404 = response.status === 200;
+    let baseline = null;
+    
+    if (isCustom404) {
+      console.log(`Detected custom 404 page with status 200 for ${domain}`);
+      const text = await response.text();
+      baseline = {
+        length: text.length,
+        status: 200,
+        // Store a small fingerprint (first 100 chars) to help identify similar pages
+        fingerprint: text.substring(0, 100)
+      };
+    }
+    
+    return baseline;
+  } catch (error) {
+    console.error(`Error getting baseline 404 for ${domain}:`, error);
+    return null;
+  }
+}
+
 // Function to scan directories and return only 200 and 302 responses with response length
 async function scanDirectories(domain) {
   try {
@@ -135,6 +171,10 @@ async function scanDirectories(domain) {
     const customPaths = await loadWordlist('directories.txt');
     const paths = customPaths.length > 0 ? customPaths : FALLBACK_DIRECTORIES;
     console.log(`Using wordlist with ${paths.length} entries for directory scanning`);
+    
+    // Get baseline for false 200 detection
+    const baseline404 = await getBaselineFalse200(domain);
+    console.log(`Baseline 404 for ${domain}:`, baseline404);
     
     const results = [];
     const batchSize = 5;
@@ -162,12 +202,33 @@ async function scanDirectories(domain) {
             const text = await response.text();
             const actualLength = text.length;
             
-            results.push({
-              url,
-              status,
-              contentLength: contentLength !== '0' ? parseInt(contentLength) : actualLength
-            });
-            console.log(`Added path to results: ${url} (${status})`);
+            // Check if this is a false 200 (custom 404 page)
+            let isFalse200 = false;
+            
+            if (status === 200 && baseline404 && baseline404.status === 200) {
+              // Compare length - if within 10% of baseline, might be a false 200
+              const lengthSimilar = Math.abs(actualLength - baseline404.length) < (baseline404.length * 0.1);
+              
+              // Check if fingerprint is present
+              const fingerprintMatch = baseline404.fingerprint && 
+                                      text.substring(0, 100).includes(baseline404.fingerprint.substring(0, 50));
+              
+              isFalse200 = lengthSimilar || fingerprintMatch;
+              
+              if (isFalse200) {
+                console.log(`Detected false 200 for ${url}`);
+              }
+            }
+            
+            // Only add valid results (not false 200s)
+            if (!isFalse200) {
+              results.push({
+                url,
+                status,
+                contentLength: contentLength !== '0' ? parseInt(contentLength) : actualLength
+              });
+              console.log(`Added path to results: ${url} (${status})`);
+            }
           }
         } catch (error) {
           // Path is likely inaccessible
@@ -260,7 +321,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       filename: message.filename || "site-sleuth-results.txt",
       saveAs: true
     }, () => {
-      URL.revokeObjectURL(url);
+      URL.revoObjectURL(url);
       sendResponse({ success: true });
     });
     return true; // Indicates we'll respond asynchronously
